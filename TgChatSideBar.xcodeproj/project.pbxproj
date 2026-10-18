@@ -8,18 +8,42 @@
 
 /* Begin PBXBuildFile section */
 		A1C5DE00000000000000000C /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000007 /* AppDelegate.swift */; };
-		A1C5DE00000000000000000F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1C5DE00000000000000000A /* Assets.xcassets */; };
 		A1C5DE00000000000000000D /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000008 /* SceneDelegate.swift */; };
-		A1C5DE00000000000000000E /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000009 /* ViewController.swift */; };
+		A1C5DE00000000000000000F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1C5DE00000000000000000A /* Assets.xcassets */; };
+		A1C5DE000000000000000102 /* CoreGraphics+Math.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000101 /* CoreGraphics+Math.swift */; };
+		A1C5DE000000000000000104 /* MotionTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000103 /* MotionTracker.swift */; };
+		A1C5DE000000000000000106 /* DebugReadout.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000105 /* DebugReadout.swift */; };
+		A1C5DE000000000000000109 /* SidebarDetent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000108 /* SidebarDetent.swift */; };
+		A1C5DE00000000000000010B /* ChatSidebarContainerViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE00000000000000010A /* ChatSidebarContainerViewController.swift */; };
+		A1C5DE00000000000000010E /* Chat.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE00000000000000010D /* Chat.swift */; };
+		A1C5DE000000000000000110 /* ChatListViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE00000000000000010F /* ChatListViewController.swift */; };
+		A1C5DE000000000000000112 /* ChatListCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000111 /* ChatListCell.swift */; };
+		A1C5DE000000000000000115 /* ChatViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000114 /* ChatViewController.swift */; };
+		A1C5DE000000000000000117 /* BubbleCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000116 /* BubbleCell.swift */; };
+		A1C5DE000000000000000202 /* SpringScalar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000201 /* SpringScalar.swift */; };
+		A1C5DE000000000000000204 /* SGBGestureRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000203 /* SGBGestureRecognizer.swift */; };
+		A1C5DE0000000000000002A2 /* PeekTouchSniffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE0000000000000002A1 /* PeekTouchSniffer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		A1C5DE000000000000000006 /* TgChatSideBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TgChatSideBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1C5DE000000000000000007 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		A1C5DE000000000000000008 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		A1C5DE00000000000000000A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1C5DE00000000000000000B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		A1C5DE000000000000000008 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
-		A1C5DE000000000000000009 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
+		A1C5DE000000000000000101 /* CoreGraphics+Math.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CoreGraphics+Math.swift"; sourceTree = "<group>"; };
+		A1C5DE000000000000000103 /* MotionTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionTracker.swift; sourceTree = "<group>"; };
+		A1C5DE000000000000000105 /* DebugReadout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugReadout.swift; sourceTree = "<group>"; };
+		A1C5DE000000000000000108 /* SidebarDetent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarDetent.swift; sourceTree = "<group>"; };
+		A1C5DE00000000000000010A /* ChatSidebarContainerViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSidebarContainerViewController.swift; sourceTree = "<group>"; };
+		A1C5DE00000000000000010D /* Chat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Chat.swift; sourceTree = "<group>"; };
+		A1C5DE00000000000000010F /* ChatListViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatListViewController.swift; sourceTree = "<group>"; };
+		A1C5DE000000000000000111 /* ChatListCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatListCell.swift; sourceTree = "<group>"; };
+		A1C5DE000000000000000114 /* ChatViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewController.swift; sourceTree = "<group>"; };
+		A1C5DE000000000000000116 /* BubbleCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BubbleCell.swift; sourceTree = "<group>"; };
+		A1C5DE000000000000000201 /* SpringScalar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SpringScalar.swift"; sourceTree = "<group>"; };
+		A1C5DE000000000000000203 /* SGBGestureRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SGBGestureRecognizer.swift"; sourceTree = "<group>"; };
+		A1C5DE0000000000000002A1 /* PeekTouchSniffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PeekTouchSniffer.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -54,11 +78,55 @@
 			children = (
 				A1C5DE000000000000000007 /* AppDelegate.swift */,
 				A1C5DE000000000000000008 /* SceneDelegate.swift */,
-				A1C5DE000000000000000009 /* ViewController.swift */,
+				A1C5DE000000000000000107 /* Common */,
+				A1C5DE00000000000000010C /* Sidebar */,
+				A1C5DE000000000000000113 /* ChatList */,
+				A1C5DE000000000000000118 /* Chat */,
 				A1C5DE00000000000000000A /* Assets.xcassets */,
 				A1C5DE00000000000000000B /* Info.plist */,
 			);
 			path = TgChatSideBar;
+			sourceTree = "<group>";
+		};
+		A1C5DE000000000000000107 /* Common */ = {
+			isa = PBXGroup;
+			children = (
+				A1C5DE000000000000000101 /* CoreGraphics+Math.swift */,
+				A1C5DE000000000000000103 /* MotionTracker.swift */,
+				A1C5DE000000000000000105 /* DebugReadout.swift */,
+			);
+			path = Common;
+			sourceTree = "<group>";
+		};
+		A1C5DE00000000000000010C /* Sidebar */ = {
+			isa = PBXGroup;
+			children = (
+				A1C5DE0000000000000002A1 /* PeekTouchSniffer.swift */,
+				A1C5DE000000000000000201 /* SpringScalar.swift */,
+				A1C5DE000000000000000203 /* SGBGestureRecognizer.swift */,
+				A1C5DE000000000000000108 /* SidebarDetent.swift */,
+				A1C5DE00000000000000010A /* ChatSidebarContainerViewController.swift */,
+			);
+			path = Sidebar;
+			sourceTree = "<group>";
+		};
+		A1C5DE000000000000000113 /* ChatList */ = {
+			isa = PBXGroup;
+			children = (
+				A1C5DE00000000000000010D /* Chat.swift */,
+				A1C5DE00000000000000010F /* ChatListViewController.swift */,
+				A1C5DE000000000000000111 /* ChatListCell.swift */,
+			);
+			path = ChatList;
+			sourceTree = "<group>";
+		};
+		A1C5DE000000000000000118 /* Chat */ = {
+			isa = PBXGroup;
+			children = (
+				A1C5DE000000000000000114 /* ChatViewController.swift */,
+				A1C5DE000000000000000116 /* BubbleCell.swift */,
+			);
+			path = Chat;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -130,8 +198,20 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A1C5DE00000000000000000E /* ViewController.swift in Sources */,
 				A1C5DE00000000000000000D /* SceneDelegate.swift in Sources */,
+				A1C5DE0000000000000002A2 /* PeekTouchSniffer.swift in Sources */,
+				A1C5DE000000000000000202 /* SpringScalar.swift in Sources */,
+				A1C5DE000000000000000204 /* SGBGestureRecognizer.swift in Sources */,
+				A1C5DE000000000000000102 /* CoreGraphics+Math.swift in Sources */,
+				A1C5DE000000000000000104 /* MotionTracker.swift in Sources */,
+				A1C5DE000000000000000106 /* DebugReadout.swift in Sources */,
+				A1C5DE000000000000000109 /* SidebarDetent.swift in Sources */,
+				A1C5DE00000000000000010B /* ChatSidebarContainerViewController.swift in Sources */,
+				A1C5DE00000000000000010E /* Chat.swift in Sources */,
+				A1C5DE000000000000000110 /* ChatListViewController.swift in Sources */,
+				A1C5DE000000000000000112 /* ChatListCell.swift in Sources */,
+				A1C5DE000000000000000115 /* ChatViewController.swift in Sources */,
+				A1C5DE000000000000000117 /* BubbleCell.swift in Sources */,
 				A1C5DE00000000000000000C /* AppDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -198,7 +278,7 @@
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_OPTIMIZATION_LEVEL = -Onone;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -267,6 +347,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K45U2HNVX3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = TgChatSideBar/Info.plist;
@@ -290,6 +371,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K45U2HNVX3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = TgChatSideBar/Info.plist;
