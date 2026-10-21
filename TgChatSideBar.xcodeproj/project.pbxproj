@@ -28,6 +28,9 @@
 		A1C5DE000000000000000306 /* DebugSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000305 /* DebugSettingsViewController.swift */; };
 		A1C5DE000000000000000308 /* DebugSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000307 /* DebugSettings.swift */; };
 		A1C5DE0000000000000003F2 /* LeadingEdges.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE0000000000000003F1 /* LeadingEdges.swift */; };
+		A1C5DE000000000000000502 /* CATransaction+Animations.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000501 /* CATransaction+Animations.swift */; };
+		A1C5DE000000000000000504 /* InnerGlowLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000503 /* InnerGlowLayer.swift */; };
+		A1C5DE0000000000000005F2 /* OuterShadowLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE0000000000000005F1 /* OuterShadowLayer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -54,6 +57,9 @@
 		A1C5DE000000000000000305 /* DebugSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DebugSettingsViewController.swift"; sourceTree = "<group>"; };
 		A1C5DE000000000000000307 /* DebugSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DebugSettings.swift"; sourceTree = "<group>"; };
 		A1C5DE0000000000000003F1 /* LeadingEdges.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LeadingEdges.swift"; sourceTree = "<group>"; };
+		A1C5DE000000000000000501 /* CATransaction+Animations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CATransaction+Animations.swift"; sourceTree = "<group>"; };
+		A1C5DE000000000000000503 /* InnerGlowLayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "InnerGlowLayer.swift"; sourceTree = "<group>"; };
+		A1C5DE0000000000000005F1 /* OuterShadowLayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OuterShadowLayer.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -101,6 +107,9 @@
 		A1C5DE000000000000000107 /* Common */ = {
 			isa = PBXGroup;
 			children = (
+				A1C5DE0000000000000005F1 /* OuterShadowLayer.swift */,
+				A1C5DE000000000000000501 /* CATransaction+Animations.swift */,
+				A1C5DE000000000000000503 /* InnerGlowLayer.swift */,
 				A1C5DE000000000000000307 /* DebugSettings.swift */,
 				A1C5DE000000000000000101 /* CoreGraphics+Math.swift */,
 				A1C5DE000000000000000103 /* MotionTracker.swift */,
@@ -214,6 +223,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1C5DE00000000000000000D /* SceneDelegate.swift in Sources */,
+				A1C5DE0000000000000005F2 /* OuterShadowLayer.swift in Sources */,
+				A1C5DE000000000000000502 /* CATransaction+Animations.swift in Sources */,
+				A1C5DE000000000000000504 /* InnerGlowLayer.swift in Sources */,
 				A1C5DE0000000000000003F2 /* LeadingEdges.swift in Sources */,
 				A1C5DE000000000000000302 /* ChatPage.swift in Sources */,
 				A1C5DE000000000000000304 /* ChatPageHeaderView.swift in Sources */,

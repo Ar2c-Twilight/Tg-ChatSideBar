@@ -124,6 +124,10 @@ final class ChatSidebarContainerViewController: UIViewController {
     private let highlightLeftSpring = SpringScalar()
     private let highlightRightSpring = SpringScalar()
 
+    /// 「立体感」的淡入淡出：外投影、内侧白高光、底部渐变一起来、一起走，同时它本身
+    /// 的填充淡出。配得很硬、不过冲——这是一次材质切换，不该晃。
+    private let reliefSpring = SpringScalar()
+
     /// 松手判定上一次运行时的答案。作为滞回状态回喂给它：一旦预告成了 `.peek`，
     /// 要把它劝退所需的动作就比当初劝进来时更大。
     private var isPeekPending = false
@@ -216,6 +220,12 @@ final class ChatSidebarContainerViewController: UIViewController {
         // 初值：没分裂时就是整列宽。
         highlightLeftSpring.track(0)
         highlightRightSpring.track(SidebarMetrics.peekColumnWidth)
+
+        reliefSpring.stiffness = SidebarMetrics.reliefStiffness
+        reliefSpring.dampingRatio = SidebarMetrics.reliefDamping
+        reliefSpring.onChange = { [weak self] value in
+            self?.listViewController.highlightRelief = value
+        }
 
         debugSettings.onChange = { [weak self] in
             self?.applyDebugSettings()
@@ -311,6 +321,7 @@ final class ChatSidebarContainerViewController: UIViewController {
             isVerticalLocked = false
             verticalIntentRatio = 0
             listViewController.highlightSplit = 0
+            reliefSpring.retarget(to: 0)
             stepFeedback.prepare()
             tracker.reset()
             peekFeedback.prepare()
@@ -344,6 +355,7 @@ final class ChatSidebarContainerViewController: UIViewController {
             listViewController.highlightLean = 0
             verticalIntentRatio = 0
             listViewController.highlightSplit = 0
+            reliefSpring.retarget(to: 0)
 
             if isVerticalLocked {
                 // 把容器挪到最终那一行。左边那块的位置是用**绝对行号**算的，所以
@@ -396,6 +408,7 @@ final class ChatSidebarContainerViewController: UIViewController {
         else { return }
 
         isVerticalLocked = true
+        reliefSpring.retarget(to: 1)
 
         // 把分裂钉到「满」。手速快的时候锁定可能在过渡还没走完时就发生了：
         // `highlightSplit = verticalIntentRatio × peekBlend`，而 `peekBlend` 是弹簧

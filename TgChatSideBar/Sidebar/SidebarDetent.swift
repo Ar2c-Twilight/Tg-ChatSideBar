@@ -157,6 +157,23 @@ enum SidebarMetrics {
     /// 裂开到位时两块的圆角。只在**接管之前**随纵向位移长出来，接管那一刻冻结。
     static let splitCornerRadius: CGFloat = 20
 
+    // MARK: 立体感（纵向接管后左边那块的材质）
+
+    /// 接管成立时这些效果一起淡入、手势结束一起淡出，用一个 0…1 的量统一驱动。
+    /// 弹簧配得很硬、几乎不过冲——这是一次材质切换，不该晃。
+    static let reliefStiffness: CGFloat = 900
+    static let reliefDamping: CGFloat = 1.0
+
+    /// 外投影。
+    static let reliefShadowOpacity: CGFloat = 0.28
+    static let reliefShadowRadius: CGFloat = 10
+    static let reliefShadowOffsetY: CGFloat = 4
+
+    /// 内阴影：顺着描边向内渗的一圈白色高光。
+    static let reliefGlowRadius: CGFloat = 4
+    static let reliefGlowOpacity: CGFloat = 0.9
+
+
     // MARK: 视差
 
     /// 列表还是「背后那一页」时滞后多少，按屏宽的比例。TG 的值

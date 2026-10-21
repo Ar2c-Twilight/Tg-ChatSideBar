@@ -20,6 +20,13 @@ final class ChatListViewController: UIViewController {
     /// 高亮框左边那块：`[0, peekColumnWidth]`，也就是 peek 下会露出来的那一列。
     private let highlightLeading = UIView()
 
+    /// 左边那块的外投影。单独一层而不是挂在 `highlightLeading.layer` 上——它需要一个
+    /// 反相遮罩把 bounds 之内的影子裁掉，而那个遮罩会把填充、渐变、内光一起裁没。
+    private let leadingShadow = OuterShadowLayer()
+
+    /// 左边那块的内阴影（顺着描边向内的一圈白色高光）。
+    private let leadingGlow = InnerGlowLayer()
+
     /// 右边那块：`[peekColumnWidth, 整宽]`，peek 下会被 chat 页盖住的那一段。
     ///
     /// 拆成两块是为了「分裂」那个动画——不裂的时候两块严丝合缝地贴在一起，和一整条
@@ -61,6 +68,18 @@ final class ChatListViewController: UIViewController {
         didSet {
             guard highlightLean != oldValue else { return }
             layoutHighlight()
+        }
+    }
+
+    /// 「立体感」的进度，0…1。0 = 一块平的半透明色块（和接管之前一样），1 = 带外
+    /// 投影和内侧白高光的一块「有厚度」的卡片，而它本身的填充淡到全透明。
+    ///
+    /// 三样东西由这一个量统一驱动，所以它们必然同步；而且**每帧重算**而不是各自跑
+    /// 动画——块一直在被弹簧形变，CA 动画会和逐帧重设的 frame 打架。
+    var highlightRelief: CGFloat = 0 {
+        didSet {
+            guard highlightRelief != oldValue else { return }
+            applyRelief()
         }
     }
 
@@ -133,6 +152,15 @@ final class ChatListViewController: UIViewController {
             part.layer.cornerCurve = .continuous
             highlightView.addSubview(part)
         }
+
+        // 顺序：投影在最底下。它被裁得只剩 bounds 之外，所以其实和上面几层不重叠，
+        // 但逻辑上它就该在后面。`highlightLeading` 没有 clipsToBounds，所以这一层
+        // 画到 bounds 外面不会被父层裁掉。
+        highlightLeading.layer.addSublayer(leadingShadow)
+
+        leadingGlow.glowRadius = SidebarMetrics.reliefGlowRadius
+        leadingGlow.opacity = 0
+        highlightLeading.layer.addSublayer(leadingGlow)
         tableView.insertSubview(highlightView, at: 0)
     }
 
@@ -152,6 +180,19 @@ final class ChatListViewController: UIViewController {
         tableView.contentInset.bottom = contentInsets.bottom
         tableView.verticalScrollIndicatorInsets.bottom = contentInsets.bottom
         layoutHighlight()
+    }
+
+    /// 把 `highlightRelief` 摊到三样东西上。
+    private func applyRelief() {
+        let t = highlightRelief
+        let fill = UIColor.tertiarySystemFill
+        CATransaction.withoutAnimations {
+            // 它本身的填充淡出——淡的是**填充色的 alpha**，不是 `view.alpha`：后者会把
+            // 投影和两层 sublayer 一起带走，那就什么都不剩了。
+            highlightLeading.backgroundColor = fill.withAlphaComponent(fill.cgColor.alpha * (1 - t))
+            leadingShadow.shadowOpacity = Float(SidebarMetrics.reliefShadowOpacity * t)
+            leadingGlow.opacity = Float(SidebarMetrics.reliefGlowOpacity * t)
+        }
     }
 
     /// 把任意坐标空间里的一个点，换算成表的**内容坐标** y。
@@ -206,6 +247,19 @@ final class ChatListViewController: UIViewController {
         let radius = lerp(0, SidebarMetrics.splitCornerRadius, highlightSplit)
         highlightLeading.layer.cornerRadius = radius
         highlightTrailing.layer.cornerRadius = radius
+
+        // 手写的 sublayer 每次赋值都会隐式动画 0.25 秒，而这些每帧都在重设——必须关掉，
+        // 否则它们永远慢半拍、而且每帧打断上一次动画，看起来是糊的。
+        CATransaction.withoutAnimations {
+            let box = highlightLeading.bounds
+            leadingShadow.frame = box
+            leadingShadow.shapeCornerRadius = radius
+            leadingShadow.refreshPath()
+            leadingGlow.frame = box
+            leadingGlow.cornerRadius2 = radius
+            leadingGlow.refreshPath()
+        }
+        applyRelief()
     }
 
     /// 直接遍历可见 cell 而不是 reload，和 TG 一个路子
