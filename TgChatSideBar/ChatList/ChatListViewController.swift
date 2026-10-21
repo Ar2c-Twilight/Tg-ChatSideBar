@@ -12,24 +12,64 @@ final class ChatListViewController: UIViewController {
 
     private let tableView = UITableView(frame: .zero, style: .plain)
 
-    /// 全出血直角的选中高亮。插在表的最底层，所以 cell 的内容画在它上面
-    /// （cell 的背景是透明的）；它是表的子视图，于是跟着内容一起滚动。
+    /// 选中高亮。它本身只是个**定位用的容器**（透明），真正画出来的是下面两块。
+    /// 插在表的最底层，所以 cell 的内容画在它上面（cell 的背景是透明的）；它是表的
+    /// 子视图，于是跟着内容一起滚动。
     private let highlightView = UIView()
+
+    /// 高亮框左边那块：`[0, peekColumnWidth]`，也就是 peek 下会露出来的那一列。
+    private let highlightLeading = UIView()
+
+    /// 右边那块：`[peekColumnWidth, 整宽]`，peek 下会被 chat 页盖住的那一段。
+    ///
+    /// 拆成两块是为了「分裂」那个动画——不裂的时候两块严丝合缝地贴在一起，和一整条
+    /// 实心块没有区别。
+    private let highlightTrailing = UIView()
     private let titleLabel = UILabel()
     private let chats = Chat.samples
 
-    /// 高亮框停在第几行——**连续值**，不是索引。`nil` 表示没有选中任何 chat
-    /// （`.list` 全屏时就是这样），框隐藏。
+    /// **容器**停在第几行。`nil` 表示没有选中任何 chat（`.list` 全屏时就是这样），
+    /// 整个高亮框隐藏。
     ///
-    /// 做成连续值是为了纵向手势：手指纵向拖的时候框要在行与行之间平滑滑动，
-    /// 停在 2.5 就意味着它正骑在第 2 行和第 3 行中间。这也是为什么它是覆盖在
-    /// 表上的一个独立视图，而不再是每个 cell 自己的子视图——跨行滑动的东西不能
-    /// 属于任何一行。
+    /// 它只在换行、点选、手势结束重置这些离散时刻变——**右边那块的 y 完全由它决定，
+    /// 所以它不动，右边那块就一帧都不会动**。纵向拖动期间它是钉住的。
     var highlightRow: CGFloat? {
         didSet {
             guard highlightRow != oldValue else { return }
             layoutHighlight()
             updateSeparators()
+        }
+    }
+
+    /// **左边那块**的四条边，每条由一根独立的弹簧驱动。
+    ///
+    /// 纵向是**绝对行号**而不是相对容器的偏移，所以容器挪位置不会让它跟着动：画的
+    /// 时候减一下容器行号就行。手势结束时重置容器正是靠这个性质才不留痕迹。
+    var leadingEdges: LeadingEdges? {
+        didSet {
+            guard leadingEdges != oldValue else { return }
+            layoutHighlight()
+            updateSeparators()
+        }
+    }
+
+    /// **接管之前**叠在左边那块上的 y 偏移，pt。正值往下。
+    ///
+    /// 只在这一段存在：那时框还钉在选中行上、没有可以揉进去的弹簧目标，所以偏移
+    /// 只能直接加在 frame 上。接管之后它恒为 0，倾斜改由弹簧目标承担。
+    var highlightLean: CGFloat = 0 {
+        didSet {
+            guard highlightLean != oldValue else { return }
+            layoutHighlight()
+        }
+    }
+
+    /// 「分裂」的进度，0…1。0 = 两块严丝合缝的直角实心块（和没拆之前一模一样），
+    /// 1 = 两块缩小、带圆角、中间裂开一道缝。纯视觉，不参与任何判定。
+    var highlightSplit: CGFloat = 0 {
+        didSet {
+            guard highlightSplit != oldValue else { return }
+            layoutHighlight()
         }
     }
 
@@ -87,8 +127,12 @@ final class ChatListViewController: UIViewController {
         tableView.contentInsetAdjustmentBehavior = .never
         view.addSubview(tableView)
 
-        highlightView.backgroundColor = .tertiarySystemFill
         highlightView.isUserInteractionEnabled = false
+        for part in [highlightLeading, highlightTrailing] {
+            part.backgroundColor = .tertiarySystemFill
+            part.layer.cornerCurve = .continuous
+            highlightView.addSubview(part)
+        }
         tableView.insertSubview(highlightView, at: 0)
     }
 
@@ -110,17 +154,58 @@ final class ChatListViewController: UIViewController {
         layoutHighlight()
     }
 
+    /// 把任意坐标空间里的一个点，换算成表的**内容坐标** y。
+    ///
+    /// 容器算倾斜量要用它：倾斜 = 手指和高亮框之间的距离，而框的位置容器自己知道
+    /// （就是弹簧的值），这里只补上「手指在内容坐标里是多少」这一半。
+    func contentY(of point: CGPoint, from space: UICoordinateSpace) -> CGFloat {
+        tableView.convert(point, from: space).y
+    }
+
+    /// 某个点落在第几行。点可以来自任何坐标空间（手势通常给的是容器的）。
+    ///
+    /// 换算到 `tableView` 自己的坐标系就自动把滚动偏移算进去了——`UIScrollView` 的
+    /// `bounds.origin` 就是 `contentOffset`，`convert(_:from:)` 会处理它。所以这里
+    /// 拿到的是**内容坐标**，列表滚过之后依然对得上行。
+    ///
+    /// 首尾越界只做夹住（这本来就是个快捷手势，真要翻页不如直接返回上一级）。
+    func rowIndex(at point: CGPoint, from space: UICoordinateSpace) -> Int {
+        let inContent = tableView.convert(point, from: space)
+        let raw = Int((inContent.y / SidebarMetrics.cellHeight).rounded(.down))
+        return Swift.min(Swift.max(raw, 0), chats.count - 1)
+    }
+
     private func layoutHighlight() {
         guard let highlightRow else {
             highlightView.isHidden = true
             return
         }
         highlightView.isHidden = false
-        let height = SidebarMetrics.cellHeight
-        highlightView.frame = CGRect(x: 0,
-                                     y: highlightRow * height,
-                                     width: tableView.bounds.width,
-                                     height: height)
+
+        let rowHeight = SidebarMetrics.cellHeight
+        let column = SidebarMetrics.peekColumnWidth
+
+        // 容器恒为一行高，钉在 `highlightRow` 上。
+        highlightView.frame = CGRect(x: 0, y: highlightRow * rowHeight,
+                                     width: tableView.bounds.width, height: rowHeight)
+
+        // 右边那块：容器坐标里的 (column, 0)，一行高。**没有任何东西会改它。**
+        highlightTrailing.frame = CGRect(x: column, y: 0,
+                                         width: Swift.max(0, highlightView.bounds.width - column),
+                                         height: rowHeight)
+
+        // 左边那块：四条边全部来自弹簧。纵向减去容器行号换算成相对位置，所以它可以
+        // 飞到容器外面去（容器不裁切）；横向本来就是容器坐标。
+        let edges = leadingEdges ?? LeadingEdges(top: highlightRow, bottom: highlightRow + 1,
+                                                  left: 0, right: column)
+        highlightLeading.frame = CGRect(x: edges.left,
+                                        y: (edges.top - highlightRow) * rowHeight + highlightLean,
+                                        width: Swift.max(0, edges.right - edges.left),
+                                        height: Swift.max(0, (edges.bottom - edges.top) * rowHeight))
+
+        let radius = lerp(0, SidebarMetrics.splitCornerRadius, highlightSplit)
+        highlightLeading.layer.cornerRadius = radius
+        highlightTrailing.layer.cornerRadius = radius
     }
 
     /// 直接遍历可见 cell 而不是 reload，和 TG 一个路子
@@ -135,13 +220,17 @@ final class ChatListViewController: UIViewController {
 
     /// 高亮框是全出血直角的，压在它上下两条边上的细线会正好横在它身上，所以要藏掉。
     ///
-    /// 用框的实际跨度算，而不是「选中行和它上面那行」——框现在可以停在行与行之间，
-    /// 那时候它同时压着两行的边界。框占据 `[highlightRow, highlightRow + 1]` 这段
-    /// （单位是行），第 `row` 行底下那条线在 `row + 1` 处。
+    /// 用框的实际跨度算，而不是「选中行和它上面那行」——框可以停在行与行之间、
+    /// 还会被拉长，那时它同时压着好几条边界。第 `row` 行底下那条线在 `row + 1` 处。
     private func hidesSeparator(below row: Int) -> Bool {
         guard let highlightRow else { return false }
         let boundary = CGFloat(row + 1)
-        return boundary >= highlightRow && boundary <= highlightRow + 1
+        // 两块各自压着不同的行：右边那块钉在容器上，左边那块跟着弹簧跑。
+        let underTrailing = boundary >= highlightRow && boundary <= highlightRow + 1
+        let top = leadingEdges?.top ?? highlightRow
+        let bottom = leadingEdges?.bottom ?? highlightRow + 1
+        let underLeading = boundary >= top && boundary <= bottom
+        return underTrailing || underLeading
     }
 }
 

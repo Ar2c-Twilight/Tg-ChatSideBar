@@ -22,10 +22,13 @@ enum SidebarDetent {
     /// 这个手势——没有东西可拉。
     case list
 
-    var progress: CGFloat {
+    /// 需要屏宽是因为 `.peek` 的停靠点是由**列宽**定义的（见
+    /// `SidebarMetrics.peekColumnWidth`），而 `progress` 是归一化的比例，两者之间
+    /// 要除一下屏宽。
+    func progress(width: CGFloat) -> CGFloat {
         switch self {
         case .chat: return 0
-        case .peek: return SidebarMetrics.peekProgress
+        case .peek: return SidebarMetrics.peekProgress(width: width)
         case .list: return 1
         }
     }
@@ -36,13 +39,34 @@ enum SidebarMetrics {
 
     // MARK: 停靠点与判据
 
-    /// `.peek` 吸附到哪儿。刻意做成固定值——这不是 iPadOS 分屏那种可以自由拖
-    /// 分隔条的模式；列宽确定下来，cell 的布局才是被设计出来的，而不是勉强活着。
-    static let peekProgress: CGFloat = 0.3
+    /// `.peek` 停靠时侧栏的列宽，pt。
+    ///
+    /// 定成**头像加左右对称的内边距**，于是 peek 下头像正好居中在列里。试过定成和行高
+    /// 相等（cell 正好是正方形，76pt），但那样头像贴着列的右边缘、左 16 右 0，实际观感
+    /// 不如留出对称留白。
+    ///
+    /// 由尺寸倒推而不是直接定一个 progress 比例：比例会随屏宽漂，而「头像两边留白相等」
+    /// 是一条和设备无关的几何约束。
+    static var peekColumnWidth: CGFloat { cellLeftInset * 2 + avatarSize }
+
+    /// 把列宽换算成 `progress`。刻意由列宽倒推而不是反过来——这不是 iPadOS 分屏那种
+    /// 可以自由拖分隔条的模式，列宽确定下来，cell 的布局才是被设计出来的。
+    static func peekProgress(width: CGFloat) -> CGFloat {
+        guard width > 0 else { return 0 }
+        return (peekColumnWidth / width).clamped(to: 0...1)
+    }
 
     /// **位移**判据：页面实际要到哪个区间，`.peek` 才在候选里。单窗口、无滞回
     /// ——这是个位置，用户看得见它在哪，本来就没有抖动可言。
-    static let peekWindow: ClosedRange<CGFloat> = 0.2...0.6
+    ///
+    /// 下界必须**低于** `peekProgress(width:)`，否则吸附点落在窗口外面：松手判定要求
+    /// 「至少到 0.2」，却又把它往回吸到窗口之外，于是永远没法在吸附点上松手并被判为
+    /// peek，进入预告时的触觉也不会在吸附点附近响。
+    ///
+    /// 92pt 的列宽在所有 iPhone 宽度上换算出来都 ≥ 0.209，所以 0.2 这个固定下界是
+    /// 安全的——这也是列宽从 76 放宽到 92 顺带解决掉的一个问题：列宽是绝对值而窗口
+    /// 是归一化比例，列越窄、宽屏上的余量越薄，76pt 时 Plus 和 Pro Max 上就会翻负。
+    static let peekWindow: ClosedRange<CGFloat> = 0.2...0.8
 
     /// **动量**判据，滞回就住在这儿。
     ///
@@ -57,14 +81,6 @@ enum SidebarMetrics {
     /// 在默认阻尼率下，0.4 约合 315 pt/s，0.6 约合 470 pt/s。
     static let momentumEnterThreshold: CGFloat = 0.4
     static let momentumExitThreshold: CGFloat = 0.6
-
-    // MARK: arm 事件
-
-    /// 手指得真的动过，「减速」才有意义——这一条排除那种慢慢蹭、碰巧路过窗口的情况。
-    static let armMinimumPeakSpeed: CGFloat = 300
-
-    /// ……并且现在已经几乎停住。
-    static let armMaximumCurrentSpeed: CGFloat = 80
 
     // MARK: 视觉（全部取自 TG 的 NavigationTransitionCoordinator）
 
@@ -81,22 +97,65 @@ enum SidebarMetrics {
 
     // MARK: 纵向接管
 
-    /// SGB 进行中、且 `progress` 落在 `peekWindow` 里时，纵向位移超过这个值就
-    /// **夺走整个手势**：横向分量从此不再处理，档位锁死在 `.peek`，手势余下的部分
-    /// 改为驱动高亮框在侧栏里上下滑。
+    /// SGB 进行中、**且 `.peek` 已经被预告**时，纵向位移超过这个值就**夺走整个
+    /// 手势**：横向分量从此不再处理，档位锁死在 `.peek`，手势余下的部分改为驱动
+    /// 高亮框在侧栏里上下滑。
     ///
-    /// **正好是半个行高**，而这不是巧合：高亮框落在哪一行是对连续行号四舍五入得到
-    /// 的，所以「移到下一行」需要的位移也正好是半个行高。两者相等意味着**锁定和
-    /// 第一次换行是同一个瞬间发生的**——手势不会先僵住、再等你多滑一截才有反应。
+    /// 取半个行高，纯粹是「这个量级的纵向移动才算有纵向意图」的经验值——纵向接管
+    /// 之后高亮框跟的是手指的**绝对位置**，和这里走了多少已经没有换算关系了。
     ///
-    /// 这也要求纵向行程从**手势起点**算，而不是从锁定那一刻重新起算；否则触发锁定
-    /// 用掉的那半行就被丢掉了。
+    /// （早先这个值和行高的一半严格挂钩：那时框跟的是累积位移，半行正好等于「移到
+    /// 下一行」所需的量，于是锁定和第一次换行同时发生。改成绝对位置之后这层关系
+    /// 自然消失了——锁定的同时框直接去手指底下那一行，本来就是立刻就有反应。）
     static var verticalLockThreshold: CGFloat { cellHeight / 2 }
 
-    /// 高亮框一格一格跳过去的那条弹簧。比主弹簧更硬、回弹更明显一点——这一下要
-    /// 读起来像「咔哒」一声落位，而不是平滑地滑过去。
-    static let highlightStiffness: CGFloat = 420
-    static let highlightDamping: CGFloat = 0.80
+    /// 手指偏离行中心时，高亮框跟着偏多少的比例。
+    ///
+    /// 接管之后它被**揉进弹簧的目标**里（`target = rowIndex + lean`），不再是叠在
+    /// 上面的一层独立位移——于是「框在哪」只有一个来源，动画统一了。
+    ///
+    /// 接管之前没有弹簧目标可揉（框还钉在选中行上），那时它作为一个直接的 y 偏移
+    /// 加在左边那块上。
+    static let rowLeanFactor: CGFloat = 0.1
+
+    // MARK: 果冻
+
+    /// 高亮框的上下两条边各有一根弹簧。**前进方向那条更硬、跟在后面那条更软**，
+    /// 于是移动时框会被拉长、停下时弹回来——果冻感就是这么来的。
+    ///
+    /// 两个数的比值决定拉长多少；绝对值决定追得多紧（越小越滞后）。
+    static let edgeStiffnessLeading: CGFloat = 420
+    static let edgeStiffnessFollowing: CGFloat = 190
+
+    /// 横向那两条边的弹簧。左右不做软硬之分：横向的目标是对称往里收的，没有
+    /// 「前进方向」可言。
+    static let sideStiffness: CGFloat = 300
+    static let sideDamping: CGFloat = 0.55
+
+    /// 块落后目标整整一行时，左右各往里收多少 pt。
+    ///
+    /// 这是「变扁」的全部来源。横向目标**不能只由分裂进度给**——锁定之后分裂恒为 1、
+    /// 那一项是个常数，横向弹簧就一动不动（这正是之前效果不明显的原因）。改成跟
+    /// **纵向的落后量**走：块离目标越远（正在飞）就越扁，追上了就恢复。也就是动画里
+    /// 的 squash and stretch——纵向被拉长的同时横向收窄，像在守恒。
+    static let sideSquash: CGFloat = 9
+
+    /// 上下两条边共用的阻尼比。越小回弹越明显：0.82 几乎不过冲（约 1%），0.55 过冲约
+    /// 13%——换算到一行 76pt 就是落位时越过约 10pt 再荡回来。果冻要的就是这个。
+    static let edgeDamping: CGFloat = 0.70
+
+    // MARK: 高亮框的「分裂」
+
+    /// 纵向接管逼近时，高亮框会从一条通栏的实心块，裂成两块圆角卡片：
+    /// `[0, peekColumnWidth]` 和 `[peekColumnWidth, 整宽]`——正好是 peek 下露出来
+    /// 的那一列、和会被 chat 页盖住的那一段的分界。
+    ///
+    /// 进度跟着 `translationY / verticalLockThreshold` 走，接管成立的那一刻冻结，
+    /// 整个手势周期内不再变。所以它读起来是「侧栏那一块正在从列表里挣脱出来」，
+    /// 而不是一个会来回呼吸的装饰。
+    ///
+    /// 裂开到位时两块的圆角。只在**接管之前**随纵向位移长出来，接管那一刻冻结。
+    static let splitCornerRadius: CGFloat = 20
 
     // MARK: 视差
 
@@ -112,7 +171,7 @@ enum SidebarMetrics {
     // MARK: 聊天列表的 cell
 
     static let cellHeight: CGFloat = 76
-    static let avatarSize: CGFloat = 56
+    static let avatarSize: CGFloat = 60
     static let cellLeftInset: CGFloat = 16
     static let cellTextGap: CGFloat = 12
 
@@ -132,7 +191,7 @@ enum SidebarMetrics {
     // MARK: 切换 chat
 
     /// 必须明显短于收回的弹簧，这样页面贴边之前新 chat 就已经就位了。
-    static let chatCrossFadeDuration: TimeInterval = 0.2
+    static let chatCrossFadeDuration: TimeInterval = 0.1
 }
 
 /// 松手判定。做成一组只吃普通数字的自由函数，这样不跑任何 UI 也能推演和断言。
@@ -163,7 +222,7 @@ enum SidebarRelease {
         }
 
         // 不是 peek，那就由这一甩决定方向——没什么可读的甩动时，退化成按位置判。
-        return progress + momentum < SidebarMetrics.peekProgress ? .chat : .list
+        return progress + momentum < SidebarMetrics.peekProgress(width: width) ? .chat : .list
     }
 
     /// 判定眼中的动量：投影出的滑行距离占屏宽的比例。暴露出来是给调试读数用的，
@@ -173,12 +232,4 @@ enum SidebarRelease {
         return MotionTracker.project(velocityX, decelerationRate: decelerationRate) / width
     }
 
-    /// arm 事件该不该触发：在窗口内、刚才很快、现在几乎停住。只触发一次由调用方负责。
-    static func shouldArm(progress: CGFloat,
-                          peakSpeed: CGFloat,
-                          currentSpeed: CGFloat) -> Bool {
-        SidebarMetrics.peekWindow.contains(progress)
-            && peakSpeed >= SidebarMetrics.armMinimumPeakSpeed
-            && currentSpeed <= SidebarMetrics.armMaximumCurrentSpeed
-    }
 }

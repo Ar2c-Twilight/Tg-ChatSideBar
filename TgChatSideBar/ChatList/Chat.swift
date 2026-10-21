@@ -9,7 +9,19 @@ import UIKit
 /// 让列表画出一行能区分开的东西。
 struct Chat: Identifiable, Equatable {
 
+    /// 这一行点开之后右栏放什么。
+    ///
+    /// 标记放在**模型**上，回答的是「这是哪一页」（数据）；至于「它长什么样」
+    /// （表现）由另一个 `ChatPage` 类型负责。两件事分开，所以不用在
+    /// `ChatViewController` 里塞分支。
+    enum Kind {
+        case conversation
+        /// 调试开关页。放在第一行，一起来就看得见。
+        case debugPanel
+    }
+
     let id: Int
+    let kind: Kind
     let name: String
     let lastMessage: String
     let tint: UIColor
@@ -32,8 +44,9 @@ struct Chat: Identifiable, Equatable {
         // 而它并没有。
         return (0..<names.count).map { index in
             Chat(id: index,
-                 name: names[index],
-                 lastMessage: messages[index],
+                 kind: index == 0 ? .debugPanel : .conversation,
+                 name: index == 0 ? "调试开关" : names[index],
+                 lastMessage: index == 0 ? "读数、容许窗口的显隐" : messages[index],
                  tint: .systemBlue)
         }
     }()

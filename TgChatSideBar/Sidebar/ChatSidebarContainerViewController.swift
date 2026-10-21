@@ -34,7 +34,7 @@ final class ChatSidebarContainerViewController: UIViewController {
     }
 
     private let listViewController = ChatListViewController()
-    private var chatViewController: ChatViewController?
+    private var chatViewController: (any ChatPage)?
 
     /// 右栏是一个*槽位*，不是某个 view controller。`layout(for:)` 只负责摆这个
     /// 视图、从不往里看——这正是切 chat 的交叉淡入能独立于吸附动画运行的原因，
@@ -44,6 +44,13 @@ final class ChatSidebarContainerViewController: UIViewController {
     private let dimView = UIView()
     private let shadowView = UIImageView()
     private let readout = DebugReadout()
+
+    /// 调试开关页和容器共享这一个实例：页面改它，这边听 `onChange` 去应用。
+    private let debugSettings = DebugSettings()
+
+    /// 手势希望覆盖层显示吗。真正显不显示还要再 `&&` 上开关——这两件事得分开记，
+    /// 否则拖动途中拨开关就会算错。
+    private var wantsThresholdOverlay = false
 
     /// 调试覆盖层：松手会落到 `.peek` 的那段 `progress` 区间，拖动期间盖在所有
     /// 东西上面。让这个窗口变成可以瞄准的东西，而不是靠一个数字脑补出来的。
@@ -71,7 +78,8 @@ final class ChatSidebarContainerViewController: UIViewController {
     /// 共用同一个量，所以这三样永远不会对「现在是不是 peek」产生分歧。
     private let peekBlend = SpringScalar()
     private let tracker = MotionTracker()
-    private let armFeedback = UIImpactFeedbackGenerator(style: .rigid)
+    /// 进入 peek 预告时的那一下。语义是「这儿可以停」，所以挂在预告成立的瞬间。
+    private let peekFeedback = UIImpactFeedbackGenerator(style: .rigid)
 
     /// 每跨过一格的「咔哒」。用 selection 而不是 impact——这正是系统 picker 换一档
     /// 时用的那一下，语义对得上。（模拟器上没有触觉，真机才感觉得到。）
@@ -90,30 +98,31 @@ final class ChatSidebarContainerViewController: UIViewController {
 
     /// 正在飞的那次交叉淡入：动画器加上它正在退场的那一页。留着是为了第二次
     /// 点行时能把它立刻落地，而不是在上面再叠一层淡入——否则连点会堆出一摞 chat 页。
-    private var pendingCrossFade: (animator: UIViewPropertyAnimator, outgoing: ChatViewController)?
-
-    /// 一次拖动只 arm 一次：触觉只响一下。
-    private var hasArmedThisDrag = false
+    private var pendingCrossFade: (animator: UIViewPropertyAnimator, outgoing: any ChatPage)?
 
     /// 纵向接管已经发生：横向分量从此被忽略，档位锁在 `.peek`。
     private var isVerticalLocked = false
 
-    /// 接管发生那一刻高亮框**停靠**在第几行（整数）。纵向行程**从手势起点**算、
-    /// 不从锁定点重新起算，这样触发锁定用掉的那半行不会被丢掉——于是锁定和第一次
-    /// 换行同时发生。
-    private var highlightRowAtLock: CGFloat = 0
+    /// 纵向意图积累了多少：`|translationY| / verticalLockThreshold`，夹在 0…1。
+    /// 存下来是因为分裂进度还要乘上 `peekBlend`，而那个是弹簧驱动的、走另一个时钟。
+    private var verticalIntentRatio: CGFloat = 0
 
     /// 高亮框当前要去的那一**整数**行。段落感就在这儿：它只在跨过半行的那一刻变，
     /// 弹簧负责把框送过去。右栏的预览切换也挂在它变化的那一刻，所以框起步和内容
     /// 更换是同一个瞬间。
     private var highlightTargetRow: CGFloat = 0
 
-    /// 手势开始时右栏是哪个 chat。纵向手势结束后要靠它判断「到底换没换」——换了就
-    /// 收回全屏，绕一圈又回到原处就留在 `.peek`。
-    private var chatIDAtDragStart: Chat.ID?
+    /// 高亮框上边那条线停在第几行（连续值）。
+    private let highlightTopSpring = SpringScalar()
 
-    /// 高亮框停在第几行（连续值）。拖动时按整数档跳，松手后弹到整数行。
-    private let highlightSpring: SpringScalar = SpringScalar()
+    /// 下边那条。和上边各自独立——**前进方向那条更硬**，于是移动时框被拉长、停下时
+    /// 弹回来。果冻感就是这么来的，不是一段额外的动画。
+    private let highlightBottomSpring = SpringScalar()
+
+    /// 左右两条边，单位 pt（容器坐标）。目标由分裂进度给，所以收窄成正方形那一下
+    /// 也是弹着收的——块会先扁过头再回来。
+    private let highlightLeftSpring = SpringScalar()
+    private let highlightRightSpring = SpringScalar()
 
     /// 松手判定上一次运行时的答案。作为滞回状态回喂给它：一旦预告成了 `.peek`，
     /// 要把它劝退所需的动作就比当初劝进来时更大。
@@ -183,14 +192,35 @@ final class ChatSidebarContainerViewController: UIViewController {
         peekBlend.stiffness = SidebarMetrics.peekBlendStiffness
         peekBlend.dampingRatio = SidebarMetrics.peekBlendDamping
         peekBlend.onChange = { [weak self] _ in
-            self?.relayout()
+            guard let self else { return }
+            self.relayout()
+            // 分裂进度是它和纵向意图的乘积，所以它一动就得重算——否则这一帧用的是
+            // 上一次触摸事件时算的旧值。和倾斜那边是同一类问题。
+            self.updateHighlightSplit()
         }
 
-        highlightSpring.stiffness = SidebarMetrics.highlightStiffness
-        highlightSpring.dampingRatio = SidebarMetrics.highlightDamping
-        highlightSpring.onChange = { [weak self] value in
-            self?.listViewController.highlightRow = value
+        for spring in [highlightTopSpring, highlightBottomSpring] {
+            spring.dampingRatio = SidebarMetrics.edgeDamping
+            spring.onChange = { [weak self] _ in
+                guard let self else { return }
+                // 纵向一动，「落后多少」就变了，横向的目标得跟着重算。
+                self.updateSideTargets()
+                self.pushLeadingEdges()
+            }
         }
+        for spring in [highlightLeftSpring, highlightRightSpring] {
+            spring.stiffness = SidebarMetrics.sideStiffness
+            spring.dampingRatio = SidebarMetrics.sideDamping
+            spring.onChange = { [weak self] _ in self?.pushLeadingEdges() }
+        }
+        // 初值：没分裂时就是整列宽。
+        highlightLeftSpring.track(0)
+        highlightRightSpring.track(SidebarMetrics.peekColumnWidth)
+
+        debugSettings.onChange = { [weak self] in
+            self?.applyDebugSettings()
+        }
+        applyDebugSettings()
 
         setChat(Chat.samples[0], crossFade: false)
         moveHighlight(toRow: Chat.samples[0].id)
@@ -250,7 +280,7 @@ final class ChatSidebarContainerViewController: UIViewController {
         peekWindowOverlay.frame = CGRect(x: window.lowerBound * bounds.width, y: 0,
                                          width: (window.upperBound - window.lowerBound) * bounds.width,
                                          height: bounds.height)
-        snapLine.frame = CGRect(x: SidebarDetent.peek.progress * bounds.width - 1, y: 0,
+        snapLine.frame = CGRect(x: SidebarDetent.peek.progress(width: bounds.width) * bounds.width - 1, y: 0,
                                 width: 2, height: bounds.height)
 
         // 两个因子都往下传。`progress` 是深度线索——chat 盖得越多，列表坐得越靠后；
@@ -278,19 +308,19 @@ final class ChatSidebarContainerViewController: UIViewController {
             // 从 `.peek` 起手意味着 peek 本来就是待定落点——初始化成 false 会让
             // 第一帧预告 `.chat`，手指还没动呢视差就被拽出去了。
             isPeekPending = restingDetent == .peek
-            hasArmedThisDrag = false
             isVerticalLocked = false
-            chatIDAtDragStart = chatViewController?.chat.id
+            verticalIntentRatio = 0
+            listViewController.highlightSplit = 0
             stepFeedback.prepare()
             tracker.reset()
-            armFeedback.prepare()
+            peekFeedback.prepare()
             setThresholdOverlayVisible(true)
 
         case .changed:
             let translation = recognizer.translation(in: view)
 
             if isVerticalLocked {
-                trackVertical(translationY: translation.y)
+                trackVertical(at: recognizer.location(in: view))
                 updateReadout()
                 return
             }
@@ -298,24 +328,36 @@ final class ChatSidebarContainerViewController: UIViewController {
             spring.track((dragStartProgress + translation.x / width).clamped(to: 0...1))
             let velocity = recognizer.velocity(in: view)
             tracker.update(velocity: velocity)
-            checkArm()
             predictLanding(velocityX: velocity.x)   // 顺便推动 peekBlend
-            checkVerticalLock(translationY: translation.y)
+            verticalIntentRatio = (abs(translation.y) / SidebarMetrics.verticalLockThreshold)
+                .clamped(to: 0...1)
+            updateHighlightSplit()
+            updatePreLockLean(translationY: translation.y)
+            checkVerticalLock(translationY: translation.y,
+                              velocityY: velocity.y,
+                              location: recognizer.location(in: view))
             updateReadout()
 
         case .ended, .cancelled, .failed:
             setThresholdOverlayVisible(false)
+            // 手指走了，倾斜和分裂都没有依据了。锁定与否都一样。
+            listViewController.highlightLean = 0
+            verticalIntentRatio = 0
+            listViewController.highlightSplit = 0
 
             if isVerticalLocked {
+                // 把容器挪到最终那一行。左边那块的位置是用**绝对行号**算的，所以
+                // 这一下完全不会动它；动的只有右边那块，而它在 `.peek` 下被 chat 页
+                // 盖着，看不见。整个纵向手势期间右边那块一帧都没动过，正是为此。
+                listViewController.highlightRow = highlightTargetRow
                 // 横向那一侧早就结束了，不跑落点判定。高亮框也不用吸附——它的目标
                 // 一直就是整数行，弹簧自己会走完。
                 //
-                // 纵向手势是用来「换一个 chat」的，所以换成了就收回全屏，任务完成。
-                // 例外是绕了一圈又落回出发时那个 chat：那等于什么都没选，留在
-                // `.peek` 让用户接着挑。
-                if chatViewController?.chat.id != chatIDAtDragStart {
-                    settle(to: .chat, velocityX: 0)
-                }
+                // 纵向手势一结束就收回全屏，**不管最后停在哪一行**。曾经有个例外：
+                // 绕一圈又落回出发那个 chat 时留在 `.peek` 让用户接着挑。已去掉——
+                // 「松手就进去」是一条规则，而那个例外让同一个动作有时进去有时不进去，
+                // 用户得先回想自己从哪一行出发的才能预测结果。
+                settle(to: .chat, velocityX: 0)
                 return
             }
 
@@ -334,85 +376,160 @@ final class ChatSidebarContainerViewController: UIViewController {
     private func moveHighlight(toRow row: Int) {
         let target = CGFloat(row)
         highlightTargetRow = target
-        highlightSpring.track(target)
+        highlightTopSpring.retarget(to: target)
+        highlightTopSpring.track(target)
+        highlightBottomSpring.retarget(to: target + 1)
+        highlightBottomSpring.track(target + 1)
+        listViewController.highlightRow = target
     }
 
-    /// 纵向位移够大、而且页面正停在 peek 那段窗口里 —— 夺走手势。
+    /// 纵向位移够大、**而且 `.peek` 已经被预告** —— 夺走手势。
     ///
-    /// 窗口判据和 peek 预告用的是同一条（`peekWindow.contains(progress)`），所以
-    /// 「看起来快要停在 peek 了」和「可以切去纵向」是同一个时机，用户不需要分别
-    /// 建立两套直觉。
-    private func checkVerticalLock(translationY: CGFloat) {
+    /// 门槛用的是预告本身（`isPeekPending`）而不只是位移窗口，所以它比「落在窗口
+    /// 里」严格：动量也得已经降下来。好处是时机和视觉对齐——预告成立时 `peekBlend`
+    /// 已经把侧栏推成「完全在场」的样子（视差归位、文字隐去、头像满大小），**侧栏
+    /// 看起来可以挑行了，纵向才真的能挑行**。
+    private func checkVerticalLock(translationY: CGFloat, velocityY: CGFloat, location: CGPoint) {
         guard !isVerticalLocked,
-              SidebarMetrics.peekWindow.contains(progress),
+              isPeekPending,
               abs(translationY) > SidebarMetrics.verticalLockThreshold
         else { return }
 
         isVerticalLocked = true
-        highlightRowAtLock = highlightTargetRow
+
+        // 把分裂钉到「满」。手速快的时候锁定可能在过渡还没走完时就发生了：
+        // `highlightSplit = verticalIntentRatio × peekBlend`，而 `peekBlend` 是弹簧
+        // 驱动的，预告刚成立就立刻纵向甩的话它可能才到 0.3，于是左边那块会半收不收
+        // 地冻在那儿一整个手势。
+        //
+        // 不是硬写成 1，而是把**意图**钉成 1，剩下的交给 `peekBlend`——它在下面
+        // `setParallaxSettled(true)` 之后本来就要弹到 1，于是分裂跟着它平滑补完，
+        // 不需要额外的动画，也不会在锁定那一帧跳一下。
+        verticalIntentRatio = 1
+
+        // 交接。锁定前框的视觉位置里含着一段 lean（只加在左边那块的 frame 上），
+        // 而锁定后位置改由两根弹簧表达——直接把 lean 清零，框会瞬间弹回档位认为的
+        // 地方，就是那一下跳帧。
+        //
+        // 所以先把 lean 折算成行、连同手指当下的纵向速度一起灌进两根弹簧：**让弹簧
+        // 从「眼睛看到的位置」带着「眼睛看到的速度」接着跑**，而不是从「档位认为的
+        // 位置」静止重启。位置和速度都接上了，交接就看不出来。
+        let rowHeight = SidebarMetrics.cellHeight
+        let leanInRows = listViewController.highlightLean / rowHeight
+        let leanVelocityInRows = velocityY * SidebarMetrics.rowLeanFactor / rowHeight
+        highlightTopSpring.takeOver(value: highlightTopSpring.value + leanInRows,
+                                    velocity: leanVelocityInRows)
+        highlightBottomSpring.takeOver(value: highlightBottomSpring.value + leanInRows,
+                                       velocity: leanVelocityInRows)
+        listViewController.highlightLean = 0
 
         // 横向就此定案：锁死在 `.peek`，外观也一并锁住（`peekBlend` 到 1），
         // 这样接下来纵向滑的时候侧栏是「完全在场」的样子。
         restingDetent = .peek
         isPeekPending = true
         setParallaxSettled(true)
-        spring.animate(to: SidebarDetent.peek.progress, initialVelocity: 0)
+        spring.animate(to: SidebarDetent.peek.progress(width: view.bounds.width), initialVelocity: 0)
 
     }
 
-    /// 接管之后，手势的纵向行程驱动高亮框——**一格一格地**，不是连续滑。
+    /// 接管之后，手指的绝对位置经过一层映射变成弹簧的目标。
     ///
-    /// 框不跟手，跟的是四舍五入之后的那个整数行：每跨过半个行高，目标就跳一格，
-    /// 弹簧把框送过去。这就是段落感——判定本来就是按行发生的（右栏每行换一次
-    /// 内容），这里只是把它在视觉上也表现出来。
+    /// ```
+    /// rowIndex = round((y - 行高/2) / 行高)          ← 手指压在哪一行
+    /// lean     = (y - 该行中心) / 行高 × 0.2         ← 偏离中心多少，单位「行」
+    /// target   = rowIndex + lean
+    /// ```
     ///
-    /// 对照一下 iOS 26 tabbar 上那个 lens：它是连续滑的，因为它滑动的过程中并不
-    /// 真的切换 tab。我们这里相反，滑动途中右栏就在跳变预览，所以框也该跳。
-    private func trackVertical(translationY: CGFloat) {
-        let rows = translationY / SidebarMetrics.cellHeight
+    /// 倾斜被**揉进目标**里，不再是叠在框上的一层独立位移——于是「框该在哪」只有
+    /// 一个来源，弹簧的滞后顺带把段落感也带出来了：target 在跨行时阶跃一大截
+    /// （约 0.8 行），弹簧追过去就是那一下「咔哒」。
+    ///
+    /// 上下两条边的目标差一整行，但**哪条更硬取决于往哪边走**：前进那条先到、
+    /// 后面那条还在路上，框就被拉长了。
+    private func trackVertical(at location: CGPoint) {
+        let rowHeight = SidebarMetrics.cellHeight
         let maximum = CGFloat(Chat.samples.count - 1)
-        // 触到首尾两端的情况暂不处理（这本来就是个快捷手势，真要翻页不如直接返回
-        // 上一级），所以这里只是夹住。
-        let target = (highlightRowAtLock + rows).rounded().clamped(to: 0...maximum)
 
-        guard target != highlightTargetRow else { return }
-        highlightTargetRow = target
-        // `retarget` 而不是 `animate`：快速连划好几格时要保留弹簧已有的速度，
-        // 否则每跨一格都顿一下。
-        highlightSpring.retarget(to: target)
-        previewChat(atRow: target)
+        let y = listViewController.contentY(of: location, from: view)
+        let rowIndex = (((y - rowHeight / 2) / rowHeight).rounded()).clamped(to: 0...maximum)
+        let rowCenter = rowIndex * rowHeight + rowHeight / 2
+        let lean = (y - rowCenter) / rowHeight * SidebarMetrics.rowLeanFactor
+        let target = rowIndex + lean
+
+        // 往下走时下边是前进边，往上走时上边是前进边。
+        let movingDown = target >= highlightTopSpring.value
+        highlightTopSpring.stiffness = movingDown ? SidebarMetrics.edgeStiffnessFollowing
+                                                  : SidebarMetrics.edgeStiffnessLeading
+        highlightBottomSpring.stiffness = movingDown ? SidebarMetrics.edgeStiffnessLeading
+                                                     : SidebarMetrics.edgeStiffnessFollowing
+        highlightTopSpring.retarget(to: target)
+        highlightBottomSpring.retarget(to: target + 1)
+
+        // 右栏只跟整数行换，不跟连续的 target 换。
+        guard rowIndex != highlightTargetRow else { return }
+        highlightTargetRow = rowIndex
+        previewChat(atRow: Int(rowIndex))
     }
 
-    /// 高亮框滑到哪一行，右栏就预览哪一行——不等松手。
+    /// 把两根弹簧的当前值合成一个跨度交给列表。
+    /// 把四根弹簧的当前值合成左边那块的四条边交给列表。**只碰左边那块**——容器
+    /// （从而右边那块）由 `highlightRow` 单独管，拖动期间一动不动。
+    private func pushLeadingEdges() {
+        listViewController.leadingEdges = LeadingEdges(top: highlightTopSpring.value,
+                                                        bottom: highlightBottomSpring.value,
+                                                        left: highlightLeftSpring.value,
+                                                        right: highlightRightSpring.value)
+    }
+
+    /// 高亮框「裂开」的进度 = 纵向意图 × peek 的成色。
     ///
-    /// 用 `rounded()`：框占一整行的高度，所以「它主要压在哪一行上」就是四舍五入。
-    /// 于是每滑过一个行高，chat 就换一次。
+    /// 乘上 `peekBlend` 而不是写一个 `if isPeekPending` 的硬门槛，是因为**分裂是
+    /// 接管的预告，它的出现条件必须和接管本身一致**。用乘法还白拿了两样东西：预告
+    /// 刚成立时 `peekBlend` 从 0 弹上来、分裂跟着淡入；预告被撤销时它弹回 0、分裂
+    /// 跟着收回去。
     ///
-    /// 段落感（把这个判定在视觉上也表现出来，让框一格一格地跳）暂时不做——框现在
-    /// 是连续滑的，只有右栏在跳。
-    private func previewChat(atRow row: CGFloat) {
-        let maximum = CGFloat(Chat.samples.count - 1)
-        let index = Int(row.rounded().clamped(to: 0...maximum))
+    /// 接管之后 `verticalIntentRatio` 被钉死在 1，所以它**不再随手指呼吸**——「正在
+    /// 逼近一个不可逆的门槛」这件事，跨过门槛之后就没有可言了。但它仍然跟着
+    /// `peekBlend` 走，于是那段还没走完的过渡会被补完（见 `checkVerticalLock`）。
+    private func updateHighlightSplit() {
+        listViewController.highlightSplit = verticalIntentRatio * peekBlend.value
+        updateSideTargets()
+    }
+
+    /// 横向两条边的目标 = 分裂收窄（基线）± 纵向落后量换来的挤压。
+    ///
+    /// 挤压那一项是「变扁」的全部来源：块离纵向目标越远（正在飞）收得越窄，追上了
+    /// 就恢复。只靠分裂收窄是不够的——锁定之后分裂恒为 1，那一项是个常数。
+    private func updateSideTargets() {
+        let column = SidebarMetrics.peekColumnWidth
+        let shrink = lerp(0, column - SidebarMetrics.cellHeight,
+                          listViewController.highlightSplit)
+        let lag = abs(highlightTopSpring.target - highlightTopSpring.value)
+        let squash = Swift.min(lag, 1) * SidebarMetrics.sideSquash
+        let base = shrink / 2
+        highlightLeftSpring.retarget(to: base + squash)
+        highlightRightSpring.retarget(to: column - base - squash)
+    }
+
+    /// 接管之前，左边那块跟着纵向位移让一点，pt。
+    ///
+    /// 这一段没有可以揉进去的弹簧目标（框还钉在选中行上），所以偏移只能直接加在
+    /// frame 上。接管之后它归零，倾斜改由弹簧目标承担。
+    private func updatePreLockLean(translationY: CGFloat) {
+        guard !isVerticalLocked else { return }
+        listViewController.highlightLean = translationY * SidebarMetrics.rowLeanFactor
+    }
+
+    /// 右栏预览第 `index` 行的 chat——不等松手。
+    ///
+    /// 行号已经由 `trackVertical` 算好夹好了，这里不再取整也不再夹一遍。
+    private func previewChat(atRow index: Int) {
         let chat = Chat.samples[index]
         guard chat.id != chatViewController?.chat.id else { return }
         setChat(chat, crossFade: true)
         // 跨过一格的「咔哒」。跟着换行走而不是跟着弹簧走，所以它和右栏换内容是
         // 同一个瞬间。（模拟器上没有触觉，真机才感觉得到。）
         stepFeedback.selectionChanged()
-    }
-
-    /// 「动量突然变小」的显式检测。
-    ///
-    /// 它不能被松手时的投影取代：投影只回答手指抬起那一刻*奔着哪儿去*，而这个必须
-    /// 在**手指还按着的时候**触发——它的全部职责就是在用户下决心之前告诉他「这儿
-    /// 可以停」。触发只是提示性的：之后松手判定照常跑，用户仍然可以继续甩到 `.list`。
-    private func checkArm() {
-        guard !hasArmedThisDrag else { return }
-        guard SidebarRelease.shouldArm(progress: progress,
-                                       peakSpeed: tracker.peakSpeed,
-                                       currentSpeed: abs(tracker.velocity.x)) else { return }
-        hasArmedThisDrag = true
-        armFeedback.impactOccurred()
     }
 
     /// 现在松手会落到哪儿——顺便把 `peekBlend` 指向那个结果。
@@ -428,7 +545,19 @@ final class ChatSidebarContainerViewController: UIViewController {
                                             width: width,
                                             decelerationRate: tracker.decelerationRate,
                                             isPeekPending: isPeekPending)
+
+        // 预告刚刚成立——「这儿可以停」。触觉挂在这个**跃迁**上，而不是单独再写一套
+        // 「动量骤降」的检测：那套曾经存在过（峰值速度 ≥ 300 且当前 ≤ 80），判据和
+        // 这里不完全一致，于是会出现「视差已经归位了但没震」或者反过来的情况。并进来
+        // 之后，用户感觉到的那一下和屏幕上看到的那一下必然同源。
+        //
+        // 滞回保证了它不会在边界上连着响：要撤销预告得跑出更宽的那个动量阈值。
+        let wasPeekPending = isPeekPending
         isPeekPending = landing == .peek
+        if isPeekPending, !wasPeekPending {
+            peekFeedback.impactOccurred()
+        }
+
         setParallaxSettled(isPeekPending)
         return landing
     }
@@ -460,7 +589,7 @@ final class ChatSidebarContainerViewController: UIViewController {
         restingDetent = detent
         isPeekPending = detent == .peek
         setParallaxSettled(isPeekPending)
-        spring.animate(to: detent.progress,
+        spring.animate(to: detent.progress(width: width),
                        initialVelocity: width > 0 ? velocityX / width : 0)
         updateReadout()
     }
@@ -477,8 +606,19 @@ final class ChatSidebarContainerViewController: UIViewController {
     }
 
     private func setThresholdOverlayVisible(_ visible: Bool) {
-        peekWindowOverlay.isHidden = !visible
-        snapLine.isHidden = !visible
+        wantsThresholdOverlay = visible
+        applyThresholdOverlayVisibility()
+    }
+
+    private func applyThresholdOverlayVisibility() {
+        let shown = wantsThresholdOverlay && debugSettings.showsThresholdOverlay
+        peekWindowOverlay.isHidden = !shown
+        snapLine.isHidden = !shown
+    }
+
+    private func applyDebugSettings() {
+        readout.isHidden = !debugSettings.showsReadout
+        applyThresholdOverlayVisibility()
     }
 
     private func relayout() {
@@ -529,10 +669,11 @@ final class ChatSidebarContainerViewController: UIViewController {
             retire(outgoing)
             chatViewController = nil
             listViewController.highlightRow = nil
+            listViewController.leadingEdges = nil
             return
         }
 
-        let controller = ChatViewController(chat: chat)
+        let controller = makePage(for: chat)
         addChild(controller)
         controller.view.frame = chatContainerView.bounds
         controller.contentInsets = view.safeAreaInsets
@@ -561,6 +702,17 @@ final class ChatSidebarContainerViewController: UIViewController {
         animator.startAnimation()
     }
 
+    /// 按 chat 的 `kind` 造对应的页。容器只认 `ChatPage`，所以加一种页面不需要动
+    /// 这个文件里的其它任何地方。
+    private func makePage(for chat: Chat) -> any ChatPage {
+        switch chat.kind {
+        case .conversation:
+            return ChatViewController(chat: chat)
+        case .debugPanel:
+            return DebugSettingsViewController(chat: chat, settings: debugSettings)
+        }
+    }
+
     private func finishPendingCrossFade() {
         guard let pending = pendingCrossFade else { return }
         pendingCrossFade = nil
@@ -569,7 +721,7 @@ final class ChatSidebarContainerViewController: UIViewController {
         retire(pending.outgoing)
     }
 
-    private func retire(_ controller: ChatViewController?) {
+    private func retire(_ controller: (any ChatPage)?) {
         guard let controller, controller.parent != nil else { return }
         controller.willMove(toParent: nil)
         controller.view.removeFromSuperview()
@@ -589,10 +741,8 @@ final class ChatSidebarContainerViewController: UIViewController {
             DebugReadout.Item(title: "progress", value: String(format: "%.2f", progress)),
             DebugReadout.Item(title: "动量", value: String(format: "%.2f", momentum)),
             DebugReadout.Item(title: "阈值", value: String(format: "%.1f", limit)),
-            DebugReadout.Item(title: "峰值", value: String(format: "%.0f", tracker.peakSpeed)),
-            DebugReadout.Item(title: "armed", value: hasArmedThisDrag ? "●" : "—"),
             DebugReadout.Item(title: "纵向锁",
-                              value: isVerticalLocked ? String(format: "%.2f", highlightSpring.value) : "—"),
+                              value: isVerticalLocked ? String(format: "%.2f", highlightTopSpring.value) : "—"),
             DebugReadout.Item(title: "预告", value: isPeekPending ? "peek" : detentName),
         ])
     }

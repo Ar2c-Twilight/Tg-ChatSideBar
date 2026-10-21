@@ -35,7 +35,7 @@ final class SpringScalar {
     /// 1 = 不过冲。略小于 1 会有一点点回弹，让吸附像实物而不是机械。
     var dampingRatio: CGFloat = 0.86
 
-    private var target: CGFloat = 0
+    private(set) var target: CGFloat = 0
     private var link: CADisplayLink?
     private var lastTimestamp: CFTimeInterval = 0
 
@@ -55,6 +55,22 @@ final class SpringScalar {
             return
         }
         startLink()
+    }
+
+    /// 把弹簧的**当前状态**整个换掉（位置 + 速度），目标不动。
+    ///
+    /// 给「交接」用：某个东西已经把这个量带到了某处、还带着速度，现在要把它交给
+    /// 弹簧接着跑。`track` 只换位置、速度留在原地（通常是 0），于是接手那一下会从
+    /// 静止重新起步；这个连速度一起接，所以位置和速度都是连续的。
+    func takeOver(value newValue: CGFloat, velocity newVelocity: CGFloat) {
+        value = newValue
+        velocity = newVelocity
+        guard !isSettled else {
+            finish()
+            return
+        }
+        startLink()
+        onChange?(value)
     }
 
     /// 改变目标，但**保留弹簧已有的速度**。给那种半路会翻转的目标用：重新调

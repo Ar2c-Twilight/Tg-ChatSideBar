@@ -9,14 +9,12 @@ import UIKit
 ///
 /// 它里面装的是一个**真的滚动视图**、塞满假气泡，而不是一张静态图——因为这个 demo
 /// 里一半的手势工作就是 SGB 和纵向滚动如何共存，静态占位会让那类 bug 藏起来。
-final class ChatViewController: UIViewController {
+final class ChatViewController: UIViewController, ChatPage {
 
     let chat: Chat
 
     private let tableView = UITableView(frame: .zero, style: .plain)
-    private let header = UIView()
-    private let titleLabel = UILabel()
-    private let avatarView = UIView()
+    private let header = ChatPageHeaderView()
     private let bubbles: [(text: String, isOutgoing: Bool)]
 
     /// 从容器的安全区捕获——见 `ChatListViewController` 里的说明。这一页会横向
@@ -59,33 +57,21 @@ final class ChatViewController: UIViewController {
         tableView.register(BubbleCell.self, forCellReuseIdentifier: BubbleCell.reuseIdentifier)
         view.addSubview(tableView)
 
-        header.backgroundColor = .systemBackground
+        header.configure(with: chat)
         view.addSubview(header)
-
-        avatarView.backgroundColor = chat.tint
-        avatarView.layer.cornerRadius = 15   // half of 30: circular
-        header.addSubview(avatarView)
-
-        titleLabel.text = chat.name
-        titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
-        titleLabel.textColor = .label
-        header.addSubview(titleLabel)
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
 
         let bounds = view.bounds
-        let headerHeight = contentInsets.top + 44
-        header.frame = CGRect(x: 0, y: 0, width: bounds.width, height: headerHeight)
-        avatarView.frame = CGRect(x: 16, y: contentInsets.top + 7, width: 30, height: 30)
-        titleLabel.frame = CGRect(x: 56, y: contentInsets.top + 10,
-                                  width: Swift.max(0, bounds.width - 72), height: 24)
+        header.topInset = contentInsets.top
+        header.frame = CGRect(x: 0, y: 0, width: bounds.width, height: header.preferredHeight)
 
         tableView.frame = bounds
-        tableView.contentInset = UIEdgeInsets(top: headerHeight + 8, left: 0,
+        tableView.contentInset = UIEdgeInsets(top: header.preferredHeight + 8, left: 0,
                                               bottom: contentInsets.bottom + 8, right: 0)
-        tableView.verticalScrollIndicatorInsets = UIEdgeInsets(top: headerHeight, left: 0,
+        tableView.verticalScrollIndicatorInsets = UIEdgeInsets(top: header.preferredHeight, left: 0,
                                                                bottom: contentInsets.bottom, right: 0)
     }
 }
