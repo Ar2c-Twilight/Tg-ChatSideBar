@@ -10,7 +10,7 @@ import Foundation
 final class DebugSettings {
 
     /// 底部那条实时读数。
-    var showsReadout = true {
+    var showsReadout = false {
         didSet {
             guard showsReadout != oldValue else { return }
             onChange?()
@@ -20,7 +20,7 @@ final class DebugSettings {
     /// SGB 进行中覆盖在屏幕上的容许窗口（半透明红框 + 吸附点红线）。
     ///
     /// 注意它只是「允许显示」：实际显不显示还要看手势在不在进行中。
-    var showsThresholdOverlay = true {
+    var showsThresholdOverlay = false {
         didSet {
             guard showsThresholdOverlay != oldValue else { return }
             onChange?()

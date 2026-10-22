@@ -42,7 +42,6 @@ final class ChatSidebarContainerViewController: UIViewController {
     private let chatContainerView = UIView()
     private let listContainerView = UIView()
     private let dimView = UIView()
-    private let shadowView = UIImageView()
     private let readout = DebugReadout()
 
     /// 调试开关页和容器共享这一个实例：页面改它，这边听 `onChange` 去应用。
@@ -154,10 +153,6 @@ final class ChatSidebarContainerViewController: UIViewController {
         dimView.backgroundColor = .black
         dimView.isUserInteractionEnabled = false
         view.addSubview(dimView)
-
-        shadowView.image = ChatSidebarContainerViewController.makeShadowImage()
-        shadowView.isUserInteractionEnabled = false
-        view.addSubview(shadowView)
 
         chatContainerView.clipsToBounds = true
         view.addSubview(chatContainerView)
@@ -281,10 +276,6 @@ final class ChatSidebarContainerViewController: UIViewController {
 
         dimView.frame = bounds
         dimView.alpha = (1 - progress) * SidebarMetrics.dimAlpha
-
-        shadowView.frame = CGRect(x: chatX - SidebarMetrics.shadowWidth, y: 0,
-                                  width: SidebarMetrics.shadowWidth, height: bounds.height)
-        shadowView.alpha = (1 - progress) * SidebarMetrics.shadowAlpha
 
         let window = SidebarMetrics.peekWindow
         peekWindowOverlay.frame = CGRect(x: window.lowerBound * bounds.width, y: 0,
@@ -766,28 +757,5 @@ final class ChatSidebarContainerViewController: UIViewController {
         case .peek: return "peek"
         case .list: return "list"
         }
-    }
-
-    // MARK: - Shadow
-
-    /// chat 页前缘那条横向渐变，画一次然后纵向拉伸。构造和 TG 一样
-    /// （`NavigationTransitionCoordinator` 12-21 行），但重心压向边缘：中间那个
-    /// 色标把大部分暗度留在最后几个点里，这才让边缘读起来是硬的而不是一团软雾。
-    private static func makeShadowImage() -> UIImage {
-        let width = SidebarMetrics.shadowWidth
-        let darkness = SidebarMetrics.shadowDarkness
-        let size = CGSize(width: width, height: 1)
-        return UIGraphicsImageRenderer(size: size).image { context in
-            let colors = [UIColor.black.withAlphaComponent(0).cgColor,
-                          UIColor.black.withAlphaComponent(darkness * 0.18).cgColor,
-                          UIColor.black.withAlphaComponent(darkness).cgColor]
-            guard let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                                            colors: colors as CFArray,
-                                            locations: [0, 0.6, 1]) else { return }
-            context.cgContext.drawLinearGradient(gradient,
-                                                 start: .zero,
-                                                 end: CGPoint(x: width, y: 0),
-                                                 options: [])
-        }.resizableImage(withCapInsets: .zero, resizingMode: .stretch)
     }
 }

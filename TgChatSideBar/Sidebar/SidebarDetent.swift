@@ -87,13 +87,6 @@ enum SidebarMetrics {
     /// chat 盖住列表期间，列表上那层黑色遮罩的最大透明度。
     static let dimAlpha: CGFloat = 0.15
 
-    /// chat 页前缘那条渐变阴影。比 TG 的 16pt / 0.28 更窄更深，而且加了个中间
-    /// 色标把大部分衰减压进靠近边缘的那几个点里——这才让边缘读起来是「硬」的，
-    /// 而不是一团软雾。
-    static let shadowWidth: CGFloat = 12
-    static let shadowDarkness: CGFloat = 0.45
-
-    static let shadowAlpha: CGFloat = 0.9
 
     // MARK: 纵向接管
 
@@ -164,14 +157,20 @@ enum SidebarMetrics {
     static let reliefStiffness: CGFloat = 900
     static let reliefDamping: CGFloat = 1.0
 
-    /// 外投影。
-    static let reliefShadowOpacity: CGFloat = 0.28
-    static let reliefShadowRadius: CGFloat = 10
-    static let reliefShadowOffsetY: CGFloat = 4
+    /// 外投影。偏移取 0 = 四周均匀的一圈光晕，和块严格同心。
+    ///
+    /// 原来是 4（按「光从上方来」的惯例往下偏一点），但这块东西是在手指底下飞的，
+    /// 没有固定的「上方」可言，居中反而更稳。
+    static let reliefShadowOpacity: CGFloat = 0.20
+    static let reliefShadowRadius: CGFloat = 14
+    static let reliefShadowOffsetY: CGFloat = 0
 
-    /// 内阴影：顺着描边向内渗的一圈白色高光。
-    static let reliefGlowRadius: CGFloat = 4
-    static let reliefGlowOpacity: CGFloat = 0.9
+    /// 「叠加」高光的强度（也就是那一层白的 opacity）。
+    ///
+    /// 对应 PS 里「盖一层白、混合模式选叠加」：叠加用上面那层去调制下面的内容——
+    /// 白色会把亮部推向更亮、把暗部加倍，所以观感是提亮 + 提对比。纯白 100% 太冲，
+    /// 这里默认压到三分之一左右。
+    static let reliefOverlayStrength: CGFloat = 0.35
 
 
     // MARK: 视差

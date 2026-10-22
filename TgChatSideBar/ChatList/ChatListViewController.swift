@@ -20,12 +20,20 @@ final class ChatListViewController: UIViewController {
     /// 高亮框左边那块：`[0, peekColumnWidth]`，也就是 peek 下会露出来的那一列。
     private let highlightLeading = UIView()
 
-    /// 左边那块的外投影。单独一层而不是挂在 `highlightLeading.layer` 上——它需要一个
-    /// 反相遮罩把 bounds 之内的影子裁掉，而那个遮罩会把填充、渐变、内光一起裁没。
+    /// 左边那块的外投影，烘成位图靠九宫格拉伸——运行时零模糊开销。单独一层是因为
+    /// 它要画到 bounds 外面去。
     private let leadingShadow = OuterShadowLayer()
 
-    /// 左边那块的内阴影（顺着描边向内的一圈白色高光）。
-    private let leadingGlow = InnerGlowLayer()
+    /// 「叠加」高光：一层白，混合模式取 overlay，用来把底下的内容提亮。
+    ///
+    /// **单独一层，不能把 `compositingFilter` 设在 `highlightLeading.layer` 上**——
+    /// 合成滤镜会作用于整棵子树，把投影也算进去，于是投影会变成提亮而不是压暗。
+    ///
+    /// ⚠️ 混合模式的名字用的是 CAFilter 那套字符串常量，没有正式文档。前两次试滤色
+    /// 和减淡，看症状都是**滤镜根本没生效**（屏幕上就是裸的填充色）。所以这一层特意
+    /// 用白色 + 三分之一左右的 opacity：**生效**的话是一层提亮；**没生效**的话你会看到
+    /// 一块明显的半透明白方块——一眼就能分辨，不用猜。
+    private let leadingOverlay = CALayer()
 
     /// 右边那块：`[peekColumnWidth, 整宽]`，peek 下会被 chat 页盖住的那一段。
     ///
@@ -71,8 +79,8 @@ final class ChatListViewController: UIViewController {
         }
     }
 
-    /// 「立体感」的进度，0…1。0 = 一块平的半透明色块（和接管之前一样），1 = 带外
-    /// 投影和内侧白高光的一块「有厚度」的卡片，而它本身的填充淡到全透明。
+    /// 「立体感」的进度，0…1。0 = 一块平的半透明色块（和接管之前一样），1 = 一块带外
+    /// 投影和内侧白高光的「有厚度」卡片，而它本身的填充淡到全透明。
     ///
     /// 三样东西由这一个量统一驱动，所以它们必然同步；而且**每帧重算**而不是各自跑
     /// 动画——块一直在被弹簧形变，CA 动画会和逐帧重设的 frame 打架。
@@ -158,9 +166,19 @@ final class ChatListViewController: UIViewController {
         // 画到 bounds 外面不会被父层裁掉。
         highlightLeading.layer.addSublayer(leadingShadow)
 
-        leadingGlow.glowRadius = SidebarMetrics.reliefGlowRadius
-        leadingGlow.opacity = 0
-        highlightLeading.layer.addSublayer(leadingGlow)
+        leadingOverlay.compositingFilter = "overlayBlendMode"
+        leadingOverlay.backgroundColor = UIColor.white.cgColor
+        leadingOverlay.opacity = 0.5
+        leadingOverlay.cornerCurve = .continuous
+        // 提亮层必须和 cell **同级**，不能埋进 `highlightLeading` 里。
+        //
+        // `compositingFilter` 只和**同一个父层里已经画下的内容**混合，不是和整个窗口
+        // 的背景混合。埋进 `highlightLeading` 时它的父层缓冲区基本是空的（那块的填充
+        // 正在淡出），于是混合退化成直接输出填充色——屏幕上就是一块惨白。
+        //
+        // 挂到 `tableView.layer` 上，父层缓冲区里就有 cell 了（cell 在它之前画），
+        // 混合才有东西可混。代价是它的 frame 落在**内容坐标**里，得自己换算。
+        tableView.layer.addSublayer(leadingOverlay)
         tableView.insertSubview(highlightView, at: 0)
     }
 
@@ -190,8 +208,10 @@ final class ChatListViewController: UIViewController {
             // 它本身的填充淡出——淡的是**填充色的 alpha**，不是 `view.alpha`：后者会把
             // 投影和两层 sublayer 一起带走，那就什么都不剩了。
             highlightLeading.backgroundColor = fill.withAlphaComponent(fill.cgColor.alpha * (1 - t))
-            leadingShadow.shadowOpacity = Float(SidebarMetrics.reliefShadowOpacity * t)
-            leadingGlow.opacity = Float(SidebarMetrics.reliefGlowOpacity * t)
+            // 影子现在是一张图，所以淡入淡出的是这一层自己的 opacity，而不是
+            // `shadowOpacity`——这一层根本没有实时投影了。
+            leadingShadow.opacity = Float(SidebarMetrics.reliefShadowOpacity * t)
+            leadingOverlay.opacity = Float(SidebarMetrics.reliefOverlayStrength * t)
         }
     }
 
@@ -252,12 +272,12 @@ final class ChatListViewController: UIViewController {
         // 否则它们永远慢半拍、而且每帧打断上一次动画，看起来是糊的。
         CATransaction.withoutAnimations {
             let box = highlightLeading.bounds
-            leadingShadow.frame = box
-            leadingShadow.shapeCornerRadius = radius
-            leadingShadow.refreshPath()
-            leadingGlow.frame = box
-            leadingGlow.cornerRadius2 = radius
-            leadingGlow.refreshPath()
+            leadingShadow.layout(around: box, cornerRadius: radius,
+                                 scale: traitCollection.displayScale)
+            // 它不在容器里，所以要把左边那块的 frame 换算到表的内容坐标。
+            leadingOverlay.frame = highlightLeading.frame
+                .offsetBy(dx: highlightView.frame.minX, dy: highlightView.frame.minY)
+            leadingOverlay.cornerRadius = radius
         }
         applyRelief()
     }
