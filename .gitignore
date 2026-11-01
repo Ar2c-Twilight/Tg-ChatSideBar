@@ -46,14 +46,11 @@ fastlane/screenshots/**/*.png
 fastlane/test_output
 
 ## Demo video assets
-# 成片走 Release 附件，不进仓库历史
+# 剪辑工程与原始素材（46MB）整包走 Release 附件 main-project.zip，
+# 这样访客下载下来 AE 能直接打开，而不是对着一堆缺失素材的占位符。
+Tg-ChatSideBar-DemoVieo/main/
+# 成片与各段源片，同样在 Release 里（GIF 是 README 实际引用的成品，留在仓库）
 Tg-ChatSideBar-DemoVieo/main.mp4
-# 原始录屏等剪辑输入（35MB），不是 App 的源码
-Tg-ChatSideBar-DemoVieo/main/(Footage)/
-# Telegram 自己的 reaction 动画，从官方 API 取来做剪辑用的。
-# 那是他们的素材，不转发；需要的话按 README 里的方法自己取。
-Tg-ChatSideBar-DemoVieo/resources/reaction_tgs/
+Tg-ChatSideBar-DemoVieo/the idea.mp4
 # AE 自动保存
 **/Adobe After Effects Auto-Save/
-# AE 的 Collect Files 报告：全是本机绝对路径，对别人没用
-Tg-ChatSideBar-DemoVieo/main/mainReport.txt

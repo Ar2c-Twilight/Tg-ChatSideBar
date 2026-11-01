@@ -125,9 +125,19 @@ xcodebuild -project TgChatSideBar.xcodeproj -scheme TgChatSideBar \
 
 ## The demo video
 
-`Tg-ChatSideBar-DemoVieo/` holds the After Effects project and the automation used to
-shoot it. `resources/simtouch.swift` drives the simulator with synthesized mouse events
-from a JSON gesture script, so every take is identical:
+The whole edit — After Effects project, footage, mockups, automation — is one download:
+**[main-project.zip (36 MB) →](https://github.com/Ar2c-Twilight/Tg-ChatSideBar/releases/download/demo/main-project.zip)**
+Unpack it and `main.aep` opens with its footage already in place, rather than greeting you
+with a wall of missing-media placeholders. It is kept out of the repo so a `git clone` of
+a UIKit prototype does not drag 46 MB of video with it.
+
+The one thing the archive does not contain is `resources/reaction_tgs/` — Telegram's own
+reaction animations, pulled from the official API for the edit. Those are theirs, not
+ours to pass along; the comps that use them will come up empty. `messages.getAvailableReactions`
+returns the same set if you want your own copy.
+
+Inside, `resources/simtouch.swift` drives the simulator with synthesized mouse events from
+a JSON gesture script, so every take is identical:
 
 ```sh
 swift simtouch.swift calibrate        # once per window position/scale
@@ -138,11 +148,7 @@ swift simtouch.swift play shot.json   # replay it
 Coordinates are in device points; calibration converts to screen pixels, so the script
 does not depend on where the simulator window sits.
 
-`main/main.aep` is published as a reference for how the shot was assembled, **not as a
-project that opens cleanly**. Its footage is deliberately not in the repo: the raw screen
-recording is 32 MB of input material, and the reaction animations are Telegram's own
-assets, fetched from the official API for the edit — not ours to redistribute. Expect
-missing-footage placeholders.
+A caveat about the capture itself, since it shaped the edit:
 
 > ⚠️ `simctl io recordVideo` does **not** capture every frame. On a 20.5 s take: 202 gaps
 > longer than one frame interval, ~1.2 s of action never captured, worst gaps 180 ms and
