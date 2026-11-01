@@ -48,7 +48,7 @@ final class BubbleCell: UITableViewCell {
     }
 
     required init?(coder: NSCoder) {
-        fatalError("init(coder:) 未实现——本工程不使用 storyboard")
+        fatalError("init(coder:) is not supported - this project uses no storyboards")
     }
 
     func configure(text: String, isOutgoing: Bool, tint: UIColor) {

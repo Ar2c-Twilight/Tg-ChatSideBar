@@ -51,7 +51,7 @@ final class OuterShadowLayer: CALayer {
     }
 
     required init?(coder: NSCoder) {
-        fatalError("init(coder:) 未实现——本工程不使用 storyboard")
+        fatalError("init(coder:) is not supported - this project uses no storyboards")
     }
 
     /// 把这一层摆到 `box` 外面一圈，必要时重烘位图。

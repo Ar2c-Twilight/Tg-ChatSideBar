@@ -56,7 +56,7 @@ final class ChatListCell: UITableViewCell {
     }
 
     required init?(coder: NSCoder) {
-        fatalError("init(coder:) 未实现——本工程不使用 storyboard")
+        fatalError("init(coder:) is not supported - this project uses no storyboards")
     }
 
     /// 高亮框压着的那两条边上的 separator 要藏掉，否则会有细线横在框上。由列表

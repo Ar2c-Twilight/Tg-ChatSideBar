@@ -40,7 +40,7 @@ final class ChatViewController: UIViewController {
     }
 
     required init?(coder: NSCoder) {
-        fatalError("init(coder:) 未实现——本工程不使用 storyboard")
+        fatalError("init(coder:) is not supported - this project uses no storyboards")
     }
 
     override func viewDidLoad() {

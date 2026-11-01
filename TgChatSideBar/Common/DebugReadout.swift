@@ -40,7 +40,7 @@ final class DebugReadout: UIView {
     }
 
     required init?(coder: NSCoder) {
-        fatalError("init(coder:) 未实现——本工程不使用 storyboard")
+        fatalError("init(coder:) is not supported - this project uses no storyboards")
     }
 
     func setItems(_ items: [Item]) {
@@ -91,7 +91,7 @@ final class DebugReadout: UIView {
         }
 
         required init?(coder: NSCoder) {
-            fatalError("init(coder:) 未实现——本工程不使用 storyboard")
+            fatalError("init(coder:) is not supported - this project uses no storyboards")
         }
 
         func apply(_ item: Item) {

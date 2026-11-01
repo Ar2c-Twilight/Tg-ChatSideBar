@@ -866,11 +866,11 @@ final class ChatSidebarContainerViewController: UIViewController {
                                   : SidebarMetrics.momentumEnterThreshold
         readout.setItems([
             DebugReadout.Item(title: "progress", value: String(format: "%.2f", progress)),
-            DebugReadout.Item(title: "动量", value: String(format: "%.2f", momentum)),
-            DebugReadout.Item(title: "阈值", value: String(format: "%.1f", limit)),
-            DebugReadout.Item(title: "纵向锁",
+            DebugReadout.Item(title: "momentum", value: String(format: "%.2f", momentum)),
+            DebugReadout.Item(title: "threshold", value: String(format: "%.1f", limit)),
+            DebugReadout.Item(title: "v-lock",
                               value: isVerticalLocked ? String(format: "%.2f", highlightTopSpring.value) : "—"),
-            DebugReadout.Item(title: "预告", value: isPeekPending ? "peek" : detentName),
+            DebugReadout.Item(title: "preview", value: isPeekPending ? "peek" : detentName),
         ])
     }
 
