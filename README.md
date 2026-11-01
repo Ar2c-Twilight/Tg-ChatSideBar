@@ -7,9 +7,7 @@ into "back" or "not back".
 
 No storyboards, no XIBs, no dependencies. Just `UIKit`, `QuartzCore`, `CoreGraphics`.
 
-[![Demo video](docs/demo-poster.png)](https://github.com/Ar2c-Twilight/Tg-ChatSideBar/releases/download/demo/main.mp4)
-
-*↑ click for the 13s demo (24 MB, MP4)*
+![Demo](https://raw.githubusercontent.com/Ar2c-Twilight/Tg-ChatSideBar/master/Tg-ChatSideBar-DemoVieo/prototype.gif)
 
 ---
 
@@ -123,47 +121,20 @@ xcodebuild -project TgChatSideBar.xcodeproj -scheme TgChatSideBar \
 > get an **animatable** blur radius (`UIVisualEffectView`'s is fixed; `CIFilter` means a
 > whole offscreen pass). Fine for a prototype, will not pass App Review.
 
-## The demo video
+## Why this exists
 
-The whole edit — After Effects project, footage, mockups, automation — is one download:
-**[main-project.zip (36 MB) →](https://github.com/Ar2c-Twilight/Tg-ChatSideBar/releases/download/demo/main-project.zip)**
-Unpack it and `main.aep` opens with its footage already in place, rather than greeting you
-with a wall of missing-media placeholders. It is kept out of the repo so a `git clone` of
-a UIKit prototype does not drag 46 MB of video with it.
-
-The one thing the archive does not contain is `resources/reaction_tgs/` — Telegram's own
-reaction animations, pulled from the official API for the edit. Those are theirs, not
-ours to pass along; the comps that use them will come up empty. `messages.getAvailableReactions`
-returns the same set if you want your own copy.
-
-Inside, `resources/simtouch.swift` drives the simulator with synthesized mouse events from
-a JSON gesture script, so every take is identical:
-
-```sh
-swift simtouch.swift calibrate        # once per window position/scale
-swift simtouch.swift record out.json  # perform a gesture, save it
-swift simtouch.swift play shot.json   # replay it
-```
-
-Coordinates are in device points; calibration converts to screen pixels, so the script
-does not depend on where the simulator window sits.
-
-A caveat about the capture itself, since it shaped the edit:
-
-> ⚠️ `simctl io recordVideo` does **not** capture every frame. On a 20.5 s take: 202 gaps
-> longer than one frame interval, ~1.2 s of action never captured, worst gaps 180 ms and
-> 200 ms. Its timestamps are when the host encoder got to each frame, not when the
-> simulator presented it. Resampling to constant frame rate fixes the timeline but cannot
-> recover what was never captured.
-
-## Also
-
-The same interaction ported into Telegram for iOS:
+This prototype came first, on purpose. The interaction was designed and tuned here, then
+ported into Telegram for iOS:
 **[Ar2c-Twilight/Telegram-iOS @ chat-sidebar](https://github.com/Ar2c-Twilight/Telegram-iOS/tree/chat-sidebar)**
+
+Tuning a gesture means changing a number and feeling the result, over and over. Doing that
+inside Telegram-iOS costs a bazel build per attempt; doing it in a dependency-free UIKit app
+costs seconds. So every detent, threshold and spring constant in the fork was settled here,
+in something small enough to iterate against, and only then carried across.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](https://github.com/Ar2c-Twilight/Tg-ChatSideBar/blob/master/LICENSE).
 
 This prototype is an independent UIKit implementation and contains no Telegram source.
 The Telegram fork linked above is GPLv2, as upstream requires; that obligation stays
