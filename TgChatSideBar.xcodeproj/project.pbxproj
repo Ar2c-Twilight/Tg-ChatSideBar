@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A1C5DE000000000000000702 /* BlurFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000701 /* BlurFilter.swift */; };
 		A1C5DE00000000000000000C /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000007 /* AppDelegate.swift */; };
 		A1C5DE00000000000000000D /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000008 /* SceneDelegate.swift */; };
 		A1C5DE00000000000000000F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1C5DE00000000000000000A /* Assets.xcassets */; };
@@ -23,9 +24,7 @@
 		A1C5DE000000000000000202 /* SpringScalar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000201 /* SpringScalar.swift */; };
 		A1C5DE000000000000000204 /* SGBGestureRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000203 /* SGBGestureRecognizer.swift */; };
 		A1C5DE0000000000000002A2 /* PeekTouchSniffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE0000000000000002A1 /* PeekTouchSniffer.swift */; };
-		A1C5DE000000000000000302 /* ChatPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000301 /* ChatPage.swift */; };
 		A1C5DE000000000000000304 /* ChatPageHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000303 /* ChatPageHeaderView.swift */; };
-		A1C5DE000000000000000306 /* DebugSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000305 /* DebugSettingsViewController.swift */; };
 		A1C5DE000000000000000308 /* DebugSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000307 /* DebugSettings.swift */; };
 		A1C5DE0000000000000003F2 /* LeadingEdges.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE0000000000000003F1 /* LeadingEdges.swift */; };
 		A1C5DE000000000000000502 /* CATransaction+Animations.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C5DE000000000000000501 /* CATransaction+Animations.swift */; };
@@ -33,6 +32,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A1C5DE000000000000000701 /* BlurFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BlurFilter.swift"; sourceTree = "<group>"; };
 		A1C5DE000000000000000006 /* TgChatSideBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TgChatSideBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1C5DE000000000000000007 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		A1C5DE000000000000000008 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -51,9 +51,7 @@
 		A1C5DE000000000000000201 /* SpringScalar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SpringScalar.swift"; sourceTree = "<group>"; };
 		A1C5DE000000000000000203 /* SGBGestureRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SGBGestureRecognizer.swift"; sourceTree = "<group>"; };
 		A1C5DE0000000000000002A1 /* PeekTouchSniffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PeekTouchSniffer.swift"; sourceTree = "<group>"; };
-		A1C5DE000000000000000301 /* ChatPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ChatPage.swift"; sourceTree = "<group>"; };
 		A1C5DE000000000000000303 /* ChatPageHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ChatPageHeaderView.swift"; sourceTree = "<group>"; };
-		A1C5DE000000000000000305 /* DebugSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DebugSettingsViewController.swift"; sourceTree = "<group>"; };
 		A1C5DE000000000000000307 /* DebugSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DebugSettings.swift"; sourceTree = "<group>"; };
 		A1C5DE0000000000000003F1 /* LeadingEdges.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LeadingEdges.swift"; sourceTree = "<group>"; };
 		A1C5DE000000000000000501 /* CATransaction+Animations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CATransaction+Animations.swift"; sourceTree = "<group>"; };
@@ -105,6 +103,7 @@
 		A1C5DE000000000000000107 /* Common */ = {
 			isa = PBXGroup;
 			children = (
+				A1C5DE000000000000000701 /* BlurFilter.swift */,
 				A1C5DE0000000000000005F1 /* OuterShadowLayer.swift */,
 				A1C5DE000000000000000501 /* CATransaction+Animations.swift */,
 				A1C5DE000000000000000307 /* DebugSettings.swift */,
@@ -141,9 +140,7 @@
 		A1C5DE000000000000000118 /* Chat */ = {
 			isa = PBXGroup;
 			children = (
-				A1C5DE000000000000000301 /* ChatPage.swift */,
 				A1C5DE000000000000000303 /* ChatPageHeaderView.swift */,
-				A1C5DE000000000000000305 /* DebugSettingsViewController.swift */,
 				A1C5DE000000000000000114 /* ChatViewController.swift */,
 				A1C5DE000000000000000116 /* BubbleCell.swift */,
 			);
@@ -222,10 +219,9 @@
 				A1C5DE00000000000000000D /* SceneDelegate.swift in Sources */,
 				A1C5DE0000000000000005F2 /* OuterShadowLayer.swift in Sources */,
 				A1C5DE000000000000000502 /* CATransaction+Animations.swift in Sources */,
+				A1C5DE000000000000000702 /* BlurFilter.swift in Sources */,
 				A1C5DE0000000000000003F2 /* LeadingEdges.swift in Sources */,
-				A1C5DE000000000000000302 /* ChatPage.swift in Sources */,
 				A1C5DE000000000000000304 /* ChatPageHeaderView.swift in Sources */,
-				A1C5DE000000000000000306 /* DebugSettingsViewController.swift in Sources */,
 				A1C5DE000000000000000308 /* DebugSettings.swift in Sources */,
 				A1C5DE0000000000000002A2 /* PeekTouchSniffer.swift in Sources */,
 				A1C5DE000000000000000202 /* SpringScalar.swift in Sources */,

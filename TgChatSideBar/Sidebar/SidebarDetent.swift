@@ -206,8 +206,36 @@ enum SidebarMetrics {
 
     // MARK: 切换 chat
 
-    /// 必须明显短于收回的弹簧，这样页面贴边之前新 chat 就已经就位了。
-    static let chatCrossFadeDuration: TimeInterval = 0.1
+    // MARK: 切 chat 的过渡
+
+    /// 新旧两页各自平移的距离，按屏高的比例。
+    ///
+    /// 不是整屏：两个聊天是列表里相邻的两行，不是栈里的两页。整屏的抛掷说的事情
+    /// 比实际发生的大。
+    static let chatSwitchTravel: CGFloat = 0.15
+
+
+    /// 离场时缩到多小，进场时从多小长回来。
+    static let chatSwitchScale: CGFloat = 0.85
+
+    /// 离场时糊到多少，进场时从多少糊回清晰。
+    static let chatSwitchBlurRadius: CGFloat = 20
+
+    /// 两段并行播放的总时长。
+    static let chatSwitchFadeDuration: TimeInterval = 0.4
+
+
+    /// 两段共用的曲线，取自 TG 自己 `.spring` 在非特殊时长下的回退分支。
+    /// 第二控制点在 (0.125, 1.0)，所以行程在前段基本走完，尾巴是一段长沉降。
+    static let chatSwitchCurve: (Float, Float, Float, Float) = (0.380, 0.700, 0.125, 1.000)
+
+    // MARK: 纵向拖动时何时真的切
+
+    /// 纵向速度低于这个值，才认为手指是**到了**某一行而不是路过，才真的换右栏。
+    ///
+    /// 用速度不用加速度：匀速扫过的手指加速度为零，用加速度会把扫动的中段读成
+    /// 「稳了」——而那恰好是要滤掉的那些行。
+    static let peekDragCommitVelocity: CGFloat = 90
 }
 
 /// 松手判定。做成一组只吃普通数字的自由函数，这样不跑任何 UI 也能推演和断言。

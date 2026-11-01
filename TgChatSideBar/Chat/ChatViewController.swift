@@ -9,11 +9,15 @@ import UIKit
 ///
 /// 它里面装的是一个**真的滚动视图**、塞满假气泡，而不是一张静态图——因为这个 demo
 /// 里一半的手势工作就是 SGB 和纵向滚动如何共存，静态占位会让那类 bug 藏起来。
-final class ChatViewController: UIViewController, ChatPage {
+final class ChatViewController: UIViewController {
 
     let chat: Chat
 
     private let tableView = UITableView(frame: .zero, style: .plain)
+
+    /// 只有气泡参与换 chat 的动画，页头不动。
+    var switchContentView: UIView { tableView }
+
     private let header = ChatPageHeaderView()
     private let bubbles: [(text: String, isOutgoing: Bool)]
 
@@ -29,13 +33,9 @@ final class ChatViewController: UIViewController, ChatPage {
     init(chat: Chat) {
         self.chat = chat
         // 每个 chat 确定性地生成，这样来回切看起来是同一段会话，而不是每次都是
-        // 一堆新的随机噪声。
-        var generator = SeededGenerator(seed: UInt64(chat.id &+ 1))
-        self.bubbles = (0..<40).map { index in
-            let length = Int.random(in: 1...4, using: &generator)
-            let text = Array(repeating: "这是一条占位消息", count: length).joined(separator: "，")
-            return (text, index % 3 == 0)
-        }
+        // 气泡是数据，来自模型。固定内容而不是随机噪声——调动画时要能一眼看出
+        // 换页有没有真的发生，随机文本做不到这一点。
+        self.bubbles = chat.script
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -73,6 +73,7 @@ final class ChatViewController: UIViewController, ChatPage {
                                               bottom: contentInsets.bottom + 8, right: 0)
         tableView.verticalScrollIndicatorInsets = UIEdgeInsets(top: header.preferredHeight, left: 0,
                                                                bottom: contentInsets.bottom, right: 0)
+
     }
 }
 

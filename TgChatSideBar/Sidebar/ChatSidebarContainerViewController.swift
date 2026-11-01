@@ -34,7 +34,7 @@ final class ChatSidebarContainerViewController: UIViewController {
     }
 
     private let listViewController = ChatListViewController()
-    private var chatViewController: (any ChatPage)?
+    private var chatViewController: (ChatViewController)?
 
     /// 右栏是一个*槽位*，不是某个 view controller。`layout(for:)` 只负责摆这个
     /// 视图、从不往里看——这正是切 chat 的交叉淡入能独立于吸附动画运行的原因，
@@ -45,7 +45,6 @@ final class ChatSidebarContainerViewController: UIViewController {
     private let readout = DebugReadout()
 
     /// 调试开关页和容器共享这一个实例：页面改它，这边听 `onChange` 去应用。
-    private let debugSettings = DebugSettings()
 
     /// 手势希望覆盖层显示吗。真正显不显示还要再 `&&` 上开关——这两件事得分开记，
     /// 否则拖动途中拨开关就会算错。
@@ -97,7 +96,8 @@ final class ChatSidebarContainerViewController: UIViewController {
 
     /// 正在飞的那次交叉淡入：动画器加上它正在退场的那一页。留着是为了第二次
     /// 点行时能把它立刻落地，而不是在上面再叠一层淡入——否则连点会堆出一摞 chat 页。
-    private var pendingCrossFade: (animator: UIViewPropertyAnimator, outgoing: any ChatPage)?
+    /// 上一次切换还没收尾时，被它留在屏上的那一页。
+    private var pendingSwitchOutgoing: (ChatViewController)?
 
     /// 纵向接管已经发生：横向分量从此被忽略，档位锁在 `.peek`。
     private var isVerticalLocked = false
@@ -110,6 +110,22 @@ final class ChatSidebarContainerViewController: UIViewController {
     /// 弹簧负责把框送过去。右栏的预览切换也挂在它变化的那一刻，所以框起步和内容
     /// 更换是同一个瞬间。
     private var highlightTargetRow: CGFloat = 0
+
+    /// 这一次切换是往下还是往上，决定两页各自从哪一侧进出。
+    private var switchDirectionIsDownwards = true
+    /// 作废掉还没收尾的上一次切换（连续换行时会出现）。
+    private var pendingSwitchToken: UUID?
+    /// 最近一次采样到的纵向速度，提交判据用。
+    /// 纵向接管期间逐帧采样手指位置，自己差分出速度。
+    ///
+    /// `recognizer.velocity(in:)` 在手指**停住**时不会更新——它会一直报上一次算出来的
+    /// 值，而「停住」恰恰是我们唯一要检测的事件。`.changed` 更是只在手指**动**的时候
+    /// 才触发，所以拿事件驱动这个判据，最关键的那一帧永远不会到。
+    /// 最近一帧采样出来的纵向速度，提交判据用。
+    private var verticalCommitVelocity: CGFloat = 0
+    private var verticalLockLink: CADisplayLink?
+    private var verticalLockLastPoint: CGPoint?
+    private var verticalLockLastTimestamp: CFTimeInterval = 0
 
     /// 高亮框上边那条线停在第几行（连续值）。
     private let highlightTopSpring = SpringScalar()
@@ -222,9 +238,6 @@ final class ChatSidebarContainerViewController: UIViewController {
             self?.listViewController.highlightRelief = value
         }
 
-        debugSettings.onChange = { [weak self] in
-            self?.applyDebugSettings()
-        }
         applyDebugSettings()
 
         setChat(Chat.samples[0], crossFade: false)
@@ -322,7 +335,8 @@ final class ChatSidebarContainerViewController: UIViewController {
             let translation = recognizer.translation(in: view)
 
             if isVerticalLocked {
-                trackVertical(at: recognizer.location(in: view))
+                // 不在这里推送：链接每帧都在采样，包括手指不动的那些帧。
+                break
                 updateReadout()
                 return
             }
@@ -342,6 +356,7 @@ final class ChatSidebarContainerViewController: UIViewController {
 
         case .ended, .cancelled, .failed:
             setThresholdOverlayVisible(false)
+            stopVerticalLockLink()
             // 手指走了，倾斜和分裂都没有依据了。锁定与否都一样。
             listViewController.highlightLean = 0
             verticalIntentRatio = 0
@@ -399,6 +414,7 @@ final class ChatSidebarContainerViewController: UIViewController {
         else { return }
 
         isVerticalLocked = true
+        startVerticalLockLink()
         reliefSpring.retarget(to: 1)
 
         // 把分裂钉到「满」。手速快的时候锁定可能在过渡还没走完时就发生了：
@@ -450,7 +466,41 @@ final class ChatSidebarContainerViewController: UIViewController {
     ///
     /// 上下两条边的目标差一整行，但**哪条更硬取决于往哪边走**：前进那条先到、
     /// 后面那条还在路上，框就被拉长了。
-    private func trackVertical(at location: CGPoint) {
+    private func startVerticalLockLink() {
+        verticalLockLastPoint = sgb.location(in: view)
+        verticalLockLastTimestamp = CACurrentMediaTime()
+        stopVerticalLockLink()
+        let link = CADisplayLink(target: self, selector: #selector(verticalLockTick))
+        link.add(to: .main, forMode: .common)
+        verticalLockLink = link
+    }
+
+    private func stopVerticalLockLink() {
+        verticalLockLink?.invalidate()
+        verticalLockLink = nil
+        verticalLockLastPoint = nil
+    }
+
+    @objc private func verticalLockTick() {
+        guard isVerticalLocked else { return }
+        let point = sgb.location(in: view)
+        let now = CACurrentMediaTime()
+
+        var velocityY: CGFloat = 0
+        if let last = verticalLockLastPoint {
+            let elapsed = now - verticalLockLastTimestamp
+            if elapsed > 0 {
+                velocityY = (point.y - last.y) / CGFloat(elapsed)
+            }
+        }
+        verticalLockLastPoint = point
+        verticalLockLastTimestamp = now
+
+        trackVertical(at: point, velocityY: velocityY)
+    }
+
+    private func trackVertical(at location: CGPoint, velocityY: CGFloat) {
+        verticalCommitVelocity = velocityY
         let rowHeight = SidebarMetrics.cellHeight
         let maximum = CGFloat(Chat.samples.count - 1)
 
@@ -471,8 +521,16 @@ final class ChatSidebarContainerViewController: UIViewController {
 
         // 右栏只跟整数行换，不跟连续的 target 换。
         guard rowIndex != highlightTargetRow else { return }
+
+        // 而且只在手指**停下来**的时候换，不在扫过的时候换。用速度不用加速度：
+        // 匀速扫过的手指加速度为零，会被读成「稳了」——而那正是要滤掉的那些行。
+        guard abs(verticalCommitVelocity) < SidebarMetrics.peekDragCommitVelocity else { return }
+
+        // 方向要在更新 `highlightTargetRow` **之前**算。写在后面的话比较的是
+        // 「新行和它自己」，恒为真，于是每一次切换都往同一个方向走。
+        let downwards = rowIndex > highlightTargetRow
         highlightTargetRow = rowIndex
-        previewChat(atRow: Int(rowIndex))
+        previewChat(atRow: Int(rowIndex), downwards: downwards)
     }
 
     /// 把两根弹簧的当前值合成一个跨度交给列表。
@@ -527,9 +585,10 @@ final class ChatSidebarContainerViewController: UIViewController {
     /// 右栏预览第 `index` 行的 chat——不等松手。
     ///
     /// 行号已经由 `trackVertical` 算好夹好了，这里不再取整也不再夹一遍。
-    private func previewChat(atRow index: Int) {
+    private func previewChat(atRow index: Int, downwards: Bool) {
         let chat = Chat.samples[index]
         guard chat.id != chatViewController?.chat.id else { return }
+        switchDirectionIsDownwards = downwards
         setChat(chat, crossFade: true)
         // 跨过一格的「咔哒」。跟着换行走而不是跟着弹簧走，所以它和右栏换内容是
         // 同一个瞬间。（模拟器上没有触觉，真机才感觉得到。）
@@ -615,13 +674,13 @@ final class ChatSidebarContainerViewController: UIViewController {
     }
 
     private func applyThresholdOverlayVisibility() {
-        let shown = wantsThresholdOverlay && debugSettings.showsThresholdOverlay
+        let shown = wantsThresholdOverlay && DebugSettings.showsThresholdOverlay
         peekWindowOverlay.isHidden = !shown
         snapLine.isHidden = !shown
     }
 
     private func applyDebugSettings() {
-        readout.isHidden = !debugSettings.showsReadout
+        readout.isHidden = !DebugSettings.showsReadout
         applyThresholdOverlayVisibility()
     }
 
@@ -654,6 +713,10 @@ final class ChatSidebarContainerViewController: UIViewController {
         // 从 `.peek` 过来是原地换内容，所以做交叉淡入。从 `.list` 过来没有「旧的」
         // 可以淡*出*——`progress` 从 1 跑到 0 本身就会让新页从右边滑进来，这是另一套
         // 视觉语言，而且对一个空槽位来说是对的那套。
+        // 点选也有方向：点下面的行，新内容就从下面进来。
+        if let current = chatViewController?.chat {
+            switchDirectionIsDownwards = chat.id > current.id
+        }
         setChat(chat, crossFade: chatViewController != nil)
         moveHighlight(toRow: chat.id)
         settle(to: .chat, velocityX: 0)
@@ -690,42 +753,102 @@ final class ChatSidebarContainerViewController: UIViewController {
             return
         }
 
-        // 只有新进来的那页做动画。两个都淡会让它们短暂地互相透出，在不透明背景上
-        // 读起来是一道灰闪，而不是一次过渡。
-        controller.view.alpha = 0
-        let animator = UIViewPropertyAnimator(duration: SidebarMetrics.chatCrossFadeDuration,
-                                              curve: .easeOut) {
-            controller.view.alpha = 1
-        }
-        animator.addCompletion { [weak self] _ in
-            guard let self else { return }
+        animateChatSwitch(from: outgoing, to: controller, downwards: switchDirectionIsDownwards)
+    }
+
+    /// 两块气泡**并行**平移，像一条胶片一起走；离场的那块同时缩小糊掉，进场的反之。
+    ///
+    /// 并行而不是先后：先后播放会让两块从不相邻，中间有一刻谁都不在位，读起来既不
+    /// 像推也不像溶解。并行时任意一刻新块的前缘都贴着旧块的后缘，位移合起来恒等于
+    /// 一个行程——这是「推」这个语言的根基。
+    ///
+    /// 只动气泡，页头和背景留在原地：换的是这一页的内容，不是换了一页。
+    private func animateChatSwitch(from outgoing: ChatViewController, to incoming: ChatViewController, downwards: Bool) {
+        let duration = SidebarMetrics.chatSwitchFadeDuration
+        let travel = view.bounds.height * SidebarMetrics.chatSwitchTravel
+        let offset = downwards ? travel : -travel
+        let scale = SidebarMetrics.chatSwitchScale
+        let radius = SidebarMetrics.chatSwitchBlurRadius
+        let curve = SidebarMetrics.chatSwitchCurve
+        let timing = CAMediaTimingFunction(controlPoints: curve.0, curve.1, curve.2, curve.3)
+
+        // 旧页的气泡要搬到新页**之上**。新页是个完整的子控制器，它的背景会把旧页整个
+        // 盖住，不搬的话离场动画一帧都看不见。旧页反正要退役，摘掉它的气泡没有副作用。
+        let departing = outgoing.switchContentView
+        departing.frame = chatContainerView.convert(departing.bounds, from: departing)
+        chatContainerView.addSubview(departing)
+
+        animateSwitchLayer(departing.layer, timing: timing, duration: duration,
+                           position: (0, -offset), alpha: (1, 0), scale: (1, scale), blur: (0, radius))
+        animateSwitchLayer(incoming.switchContentView.layer, timing: timing, duration: duration,
+                           position: (offset, 0), alpha: (0, 1), scale: (scale, 1), blur: (radius, 0))
+
+        let token = UUID()
+        pendingSwitchToken = token
+        pendingSwitchOutgoing = outgoing
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self, weak departing] in
+            guard let self, self.pendingSwitchToken == token else { return }
+            self.pendingSwitchToken = nil
+            self.pendingSwitchOutgoing = nil
+            departing?.removeFromSuperview()
+            // 留着一个闲置滤镜，这一层会永远待在离屏合成通道里。
+            incoming.switchContentView.layer.filters = []
             self.retire(outgoing)
-            self.pendingCrossFade = nil
         }
-        pendingCrossFade = (animator, outgoing)
-        animator.startAnimation()
+    }
+
+    private func animateSwitchLayer(_ layer: CALayer,
+                                    timing: CAMediaTimingFunction,
+                                    duration: TimeInterval,
+                                    position: (CGFloat, CGFloat),
+                                    alpha: (CGFloat, CGFloat),
+                                    scale: (CGFloat, CGFloat),
+                                    blur: (CGFloat, CGFloat)) {
+        if blur.0 > 0 || blur.1 > 0 {
+            layer.filters = BlurFilter.make(radius: blur.0).map { [$0] }
+        }
+        let specs: [(String, Any, Any, Bool)] = [
+            ("position.y", position.0, position.1, true),
+            ("opacity", alpha.0, alpha.1, false),
+            ("transform.scale", scale.0, scale.1, false),
+            ("filters.gaussianBlur.inputRadius", blur.0, blur.1, false)
+        ]
+        for (keyPath, from, to, additive) in specs {
+            if keyPath.hasPrefix("filters"), layer.filters?.isEmpty ?? true { continue }
+            let animation = CABasicAnimation(keyPath: keyPath)
+            animation.fromValue = from
+            animation.toValue = to
+            animation.duration = duration
+            animation.timingFunction = timing
+            animation.isAdditive = additive
+            animation.isRemovedOnCompletion = false
+            animation.fillMode = .forwards
+            layer.add(animation, forKey: additive ? nil : keyPath)
+        }
     }
 
     /// 按 chat 的 `kind` 造对应的页。容器只认 `ChatPage`，所以加一种页面不需要动
     /// 这个文件里的其它任何地方。
-    private func makePage(for chat: Chat) -> any ChatPage {
-        switch chat.kind {
-        case .conversation:
-            return ChatViewController(chat: chat)
-        case .debugPanel:
-            return DebugSettingsViewController(chat: chat, settings: debugSettings)
-        }
+    /// 右栏只有一种页面，所以这里不再是工厂，只是一句构造。
+    ///
+    /// 以前它要在「聊天」和「调试开关页」之间分叉，为此模型上有个 `Kind`、还开了
+    /// 一个 `ChatPage` 协议。开关改成代码常量之后，那三层一起没了。
+    private func makePage(for chat: Chat) -> ChatViewController {
+        ChatViewController(chat: chat)
     }
 
+    /// 把上一次还没收尾的切换立刻落地。
+    ///
+    /// 连续换行时必须有这一句，否则会堆出三四个 chat 页——这是真实的 bug 源，不是
+    /// 防御性代码。
     private func finishPendingCrossFade() {
-        guard let pending = pendingCrossFade else { return }
-        pendingCrossFade = nil
-        pending.animator.stopAnimation(false)
-        pending.animator.finishAnimation(at: .end)   // 会跑 completion
-        retire(pending.outgoing)
+        pendingSwitchToken = nil
+        guard let outgoing = pendingSwitchOutgoing else { return }
+        pendingSwitchOutgoing = nil
+        retire(outgoing)
     }
 
-    private func retire(_ controller: (any ChatPage)?) {
+    private func retire(_ controller: (ChatViewController)?) {
         guard let controller, controller.parent != nil else { return }
         controller.willMove(toParent: nil)
         controller.view.removeFromSuperview()
